@@ -5,6 +5,7 @@ import { loadLibrary } from '@/core/library'
 import type { FlowEdge, FlowNode } from '@/core/types'
 import { LEAVE_CONTAINER_TOAST, planConnectEnd, planPickerConnect } from '../plan-connect-end'
 import { planAddAtViewportCenter } from '../plan-add-node'
+import { nextSelectedIds, planNodeClick, selectionChangesFor } from '../plan-node-click'
 import { REACT_FLOW_DELETE_KEY_CODE } from '../canvas'
 import { toCanvasEdges } from '../flow-types'
 
@@ -278,6 +279,26 @@ describe('planPickerConnect', () => {
 describe('React Flow delete keys', () => {
   it('disables RF keyboard delete so menu/shortcuts own removeSelected', () => {
     expect(REACT_FLOW_DELETE_KEY_CODE).toBeNull()
+  })
+})
+
+describe('planNodeClick', () => {
+  it('opens the inspector on a plain click and adds on Shift/Ctrl', () => {
+    expect(planNodeClick({}, 'b', ['a'])).toEqual({ kind: 'exclusive', id: 'b', openInspector: true })
+    expect(planNodeClick({ shiftKey: true }, 'b', ['a'])).toEqual({ kind: 'add', id: 'b' })
+    expect(planNodeClick({ ctrlKey: true }, 'a', ['a'])).toEqual({ kind: 'remove', id: 'a' })
+    expect(nextSelectedIds({ kind: 'add', id: 'b' }, ['a'])).toEqual(['a', 'b'])
+    expect(nextSelectedIds({ kind: 'remove', id: 'a' }, ['a', 'b'])).toEqual(['b'])
+  })
+
+  it('writes select changes that keep both nodes selected after an exclusive RF click', () => {
+    const nodes = [
+      { id: 'a', selected: false },
+      { id: 'b', selected: true }
+    ]
+    const nextIds = nextSelectedIds(planNodeClick({ shiftKey: true }, 'b', ['a']), ['a'])
+    expect(nextIds).toEqual(['a', 'b'])
+    expect(selectionChangesFor(nodes, nextIds)).toEqual([{ id: 'a', type: 'select', selected: true }])
   })
 })
 

@@ -310,7 +310,17 @@ describe('flow-store', () => {
     useFlowStore.getState().selectNode('start')
     useFlowStore.getState().selectNode(created.id, { exclusive: false })
     expect(useFlowStore.getState().nodes.find((node) => node.id === created.id)?.selected).toBe(true)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === 'start')?.selected).toBe(true)
     expect(useFlowStore.getState().selectedNodeId).toBe(created.id)
+  })
+
+  it('onNodesChange select can keep two nodes selected', () => {
+    const created = agentNode()
+    useFlowStore.getState().addNode(created)
+    useFlowStore.getState().selectNode('start')
+    useFlowStore.getState().onNodesChange([{ id: created.id, type: 'select', selected: true }])
+    const selected = useFlowStore.getState().nodes.filter((node) => node.selected).map((node) => node.id)
+    expect(selected.sort()).toEqual([created.id, 'start'].sort())
   })
 
   it('loadDocument accepts null path and markUnsaved stays dirty until markSaved', () => {

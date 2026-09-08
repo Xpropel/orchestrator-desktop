@@ -8,20 +8,22 @@ import { cn } from '@/ui/cn'
 import { resolveIcon } from '@/ui/icons'
 import { ModelProviderIcon } from '@/ui/model-icons'
 import { CardResizer, cardBoxStyle } from './card-resizer'
+import {
+  CARD_DEFAULT_WIDTH,
+  CARD_MIN_HEIGHT,
+  CARD_MIN_WIDTH
+} from './card-metrics'
 import { NodeHoverToolbar } from './node-hover-toolbar'
 import { NodeIssueBadge } from './node-issue-badge'
 
-export const CARD_DEFAULT_WIDTH = 240
-export const CARD_MIN_WIDTH = 200
-/** 色条 + 标题两行；再矮会裁掉型号行或出口第一行。 */
-export const CARD_MIN_HEIGHT = 80
-/** 色条 h-1 + 标题 py-2/两行文本，与 BranchNode 出口 top 对齐。 */
-export const CARD_CHROME_HEADER_PX = 52
-export const CARD_MODEL_BADGE_PX = 22
-
-export function cardChromeHeaderPx(hasModelBadge: boolean): number {
-  return CARD_CHROME_HEADER_PX + (hasModelBadge ? CARD_MODEL_BADGE_PX : 0)
-}
+export {
+  CARD_CHROME_HEADER_PX,
+  CARD_DEFAULT_WIDTH,
+  CARD_MIN_HEIGHT,
+  CARD_MIN_WIDTH,
+  CARD_MODEL_BADGE_PX,
+  cardChromeHeaderPx
+} from './card-metrics'
 
 export const NodeChrome = memo(function NodeChrome({
   id,
@@ -78,8 +80,8 @@ export const NodeChrome = memo(function NodeChrome({
         showDelete={showDelete}
         showCopy={showCopy}
       />
-      <div className="h-1 rounded-t-[7px]" style={{ backgroundColor: color }} />
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="h-1 shrink-0 rounded-t-[7px]" style={{ backgroundColor: color }} />
+      <div className="flex h-12 shrink-0 items-center gap-2 px-3">
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
           style={{ backgroundColor: `${color}22`, color }}
@@ -87,14 +89,14 @@ export const NodeChrome = memo(function NodeChrome({
           <Icon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-primary">{data.name}</div>
-          <div className="truncate text-[10px] uppercase tracking-wide text-secondary">{typeLabel}</div>
+          <div className="truncate text-sm leading-5 font-medium text-primary">{data.name}</div>
+          <div className="truncate text-[10px] leading-3 uppercase tracking-wide text-secondary">{typeLabel}</div>
         </div>
       </div>
       {badge ? (
         <div
           data-testid="node-model-badge"
-          className="flex items-center gap-1.5 px-3 pb-1.5 text-[11px] text-secondary"
+          className="flex h-[22px] shrink-0 items-center gap-1.5 px-3 text-[11px] leading-none text-secondary"
         >
           <ModelProviderIcon provider={badge.provider} className="h-4 w-4" />
           <span className="truncate">

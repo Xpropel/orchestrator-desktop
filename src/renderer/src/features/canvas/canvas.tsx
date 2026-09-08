@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, JSX, MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
@@ -24,6 +24,7 @@ import { useAddNode } from '@/features/canvas/use-add-node'
 import { useClipboard } from '@/features/canvas/use-clipboard'
 import { runAutoLayout } from '@/features/canvas/run-auto-layout'
 import { planConnectEnd, planPickerConnect } from '@/features/canvas/plan-connect-end'
+import { nextSelectedIds, planNodeClick, selectionChangesFor } from '@/features/canvas/plan-node-click'
 import {
   findContainingContainer,
   isProtectedNode,
@@ -105,6 +106,8 @@ function FlowCanvas(): JSX.Element {
   const [picker, setPicker] = useState<PickerState | null>(null)
   const nodesInitialized = useNodesInitialized()
   const [fitPending, setFitPending] = useState(false)
+  const selectionAtPointerDown = useRef<string[]>([])
+  const applyingOwnSelect = useRef(false)
 
   useEffect(() => {
     if (viewportRequest === 0) {
@@ -227,16 +230,42 @@ function FlowCanvas(): JSX.Element {
     (event: ReactMouseEvent, node: CanvasNode) => {
       setMenu(null)
       setPicker(null)
-      if (event.shiftKey || event.ctrlKey || event.metaKey) {
-        // 修饰键多选由 React Flow 的 select 变更写入 store，这里不再重复 selectNode，也不打开属性面板。
+      const plan = planNodeClick(event, node.id, selectionAtPointerDown.current)
+      if (plan.kind === 'exclusive') {
+        selectNode(plan.id)
+        openInspector(plan.id)
         return
       }
-      // 只有真正的点击才打开属性面板；拖动结束时 React Flow 不会触发 onNodeClick。
-      selectNode(node.id)
-      openInspector(node.id)
+      const nextIds = nextSelectedIds(plan, selectionAtPointerDown.current)
+      const changes = selectionChangesFor(useFlowStore.getState().nodes, nextIds)
+      if (changes.length > 0) {
+        applyingOwnSelect.current = true
+        useFlowStore.getState().onNodesChange(changes)
+        applyingOwnSelect.current = false
+      }
     },
     [selectNode, openInspector]
   )
+
+  const handleNodesChange = useCallback<typeof onNodesChange>(
+    (changes) => {
+      if (!applyingOwnSelect.current && changes.some((change) => change.type === 'select')) {
+        selectionAtPointerDown.current = useFlowStore
+          .getState()
+          .nodes.filter((item) => item.selected)
+          .map((item) => item.id)
+      }
+      onNodesChange(changes)
+    },
+    [onNodesChange]
+  )
+
+  const onNodeMouseDown = useCallback((_event: ReactMouseEvent, _node: CanvasNode) => {
+    selectionAtPointerDown.current = useFlowStore
+      .getState()
+      .nodes.filter((item) => item.selected)
+      .map((item) => item.id)
+  }, [])
 
   const onPaneClick = useCallback(() => {
     setMenu(null)
@@ -329,7 +358,7 @@ function FlowCanvas(): JSX.Element {
       <ReactFlow<CanvasNode, CanvasEdge>
         nodes={canvasNodes}
         edges={canvasEdges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
@@ -341,6 +370,7 @@ function FlowCanvas(): JSX.Element {
         snapToGrid={false}
         deleteKeyCode={REACT_FLOW_DELETE_KEY_CODE}
         multiSelectionKeyCode={['Shift', 'Control', 'Meta']}
+        selectionKeyCode={null}
         connectionMode={ConnectionMode.Loose}
         connectionRadius={36}
         connectionLineType={ConnectionLineType.Bezier}
@@ -349,6 +379,7 @@ function FlowCanvas(): JSX.Element {
         selectionOnDrag
         panOnDrag={[1, 2]}
         onNodeClick={onNodeClick}
+        onNodeMouseDown={onNodeMouseDown}
         onPaneClick={onPaneClick}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
