@@ -8,10 +8,22 @@ import type { OperatorDefinition } from '@/core/schema'
 import { useFlowStore } from '@/state/flow-store'
 import { useUiStore } from '@/state/ui-store'
 
+export const FLYOUT_WIDTH = 280
+
+/** 某一类别下的工具列表，贴在悬浮组件栏旁边；位置由组件栏算好传入。 */
 export const OperatorFlyout = memo(function OperatorFlyout({
-  onAddOperator
+  onAddOperator,
+  left,
+  top,
+  height,
+  side
 }: {
   onAddOperator: (type: string) => void
+  left: number
+  top: number
+  height: number
+  /** 贴在组件栏的哪一侧，决定强调色边线画在哪条竖边 */
+  side: 'left' | 'right'
 }): JSX.Element | null {
   const openCategory = useUiStore((state) => state.openCategory)
   const setOpenCategory = useUiStore((state) => state.setOpenCategory)
@@ -30,7 +42,7 @@ export const OperatorFlyout = memo(function OperatorFlyout({
         setOpenCategory(null)
         return
       }
-      if (target.closest('[data-testid="operator-sidebar"]') || target.closest('[data-testid="operator-flyout"]')) {
+      if (target.closest('[data-testid="operator-palette"]') || target.closest('[data-testid="operator-flyout"]')) {
         return
       }
       setOpenCategory(null)
@@ -53,16 +65,22 @@ export const OperatorFlyout = memo(function OperatorFlyout({
     <aside
       data-testid="operator-flyout"
       className={cn(
-        'absolute left-full top-0 z-30 flex h-full w-[280px] flex-col border-r border-border bg-panel shadow-xl',
-        accent && 'border-l-2'
+        'pointer-events-auto absolute z-30 flex flex-col overflow-hidden rounded-xl border border-border bg-panel/85 shadow-2xl backdrop-blur-md',
+        accent && (side === 'right' ? 'border-l-2' : 'border-r-2')
       )}
-      style={accent ? { borderLeftColor: accent } : undefined}
+      style={{
+        left,
+        top,
+        height,
+        width: FLYOUT_WIDTH,
+        ...(accent ? (side === 'right' ? { borderLeftColor: accent } : { borderRightColor: accent }) : {})
+      }}
     >
-      <div className="border-b border-border px-3 py-2">
+      <div className="border-b border-border/70 px-3 py-2">
         <p className="text-xs font-semibold text-primary">{category?.title ?? openCategory}</p>
         <p className="text-[11px] text-secondary">{operators.length} 个工具</p>
       </div>
-      <ul className="flex-1 overflow-y-auto px-2 py-2">
+      <ul className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {operators.length === 0 ? (
           <li className="px-1.5 py-3 text-xs text-secondary">该类暂无可用工具</li>
         ) : (

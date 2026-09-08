@@ -15,7 +15,8 @@ export const CanvasToolbar = memo(function CanvasToolbar(): JSX.Element {
   const { addAtViewportCenter } = useAddNode()
 
   return (
-    <div className="absolute left-3 top-toolbar z-10 mt-1 flex items-center gap-0.5 rounded-md border border-border bg-panel/95 p-0.5 shadow-lg backdrop-blur">
+    // 底部居中：左上让给组件栏，右上让给属性面板，左下/右下是 React Flow 的缩放控件与小地图。
+    <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-md border border-border bg-panel/80 p-0.5 shadow-lg backdrop-blur-md">
       <IconButton title={labeledShortcut('undo')} disabled={!canUndo} onClick={undo}>
         <Undo2 className="h-3.5 w-3.5" />
       </IconButton>

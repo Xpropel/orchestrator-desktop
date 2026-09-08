@@ -3,8 +3,7 @@ import { Canvas } from '@/features/canvas/canvas'
 import { useAddNode } from '@/features/canvas/use-add-node'
 import { FloatingInspector } from '@/features/inspector/floating-inspector'
 import { IssuesPanel } from '@/features/issues/issues-panel'
-import { OperatorFlyout } from '@/features/palette/operator-flyout'
-import { Sidebar } from '@/features/palette/sidebar'
+import { FloatingPalette } from '@/features/palette/floating-palette'
 import { Toolbar } from '@/app/toolbar'
 import { UnsavedDialogHost } from '@/ui/unsaved-dialog'
 import { useAppShortcuts } from '@/app/use-app-shortcuts'
@@ -26,23 +25,19 @@ export default function App(): JSX.Element {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-base text-primary">
-      <div className="flex min-h-0 flex-1">
-        <div className="relative flex h-full shrink-0">
-          <Sidebar onAddOperator={addAtViewportCenter} />
-          <OperatorFlyout onAddOperator={addAtViewportCenter} />
-        </div>
-        <main className="relative min-w-0 flex-1">
-          <Canvas />
-          <Toolbar />
-          <FloatingInspector />
-        </main>
-      </div>
+      {/* 画布铺满；工具栏、组件栏、属性面板都悬浮在它上面 */}
+      <main className="relative min-h-0 flex-1">
+        <Canvas />
+        <Toolbar />
+        <FloatingPalette onAddOperator={addAtViewportCenter} />
+        <FloatingInspector />
+      </main>
       {issuesOpen ? <IssuesPanel /> : null}
       <UnsavedDialogHost />
       {toast ? (
         <div
           data-testid="toast"
-          className="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md border border-border bg-panel px-3 py-2 text-sm text-primary shadow-lg"
+          className="pointer-events-none fixed bottom-14 left-1/2 z-50 -translate-x-1/2 rounded-md border border-border bg-panel/90 px-3 py-2 text-sm text-primary shadow-lg backdrop-blur-md"
         >
           {toast}
         </div>
