@@ -8,6 +8,7 @@ export {
 export {
   collectDanglingEdgeIds,
   explainInvalidConnection,
+  hasMatchingConnection,
   isDuplicateConnection,
   isValidFlowConnection,
   normalizeFlowConnection,

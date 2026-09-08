@@ -45,8 +45,8 @@ macOS 包仅面向 **Apple Silicon**，未做 Intel 构建；未公证时首次�
   | 其他 | `misc` | 3 |
 
 - **LLM 会话**：`session` 建立上下文，`session-fork` 分叉副本，`agent` 可挂到会话上复用前缀。
-- **循环容器**：`foreach` / `while` 新建时自动带 `loop-start`；节点可拖入拖出；`break` 只能放在容器内。从容器内部拉线：落在容器空白处在容器内新建节点，落到容器外会被拒绝；容器外的连线落到容器身上即连到循环入口。
-- **校验引擎**（画布变更后约 300ms 防抖）：`NO_START`、`UNREACHABLE`、`DEAD_END`、`MISSING_REQUIRED`、`UNKNOWN_REFERENCE`、`REFERENCE_NOT_UPSTREAM`、`TYPE_MISMATCH`、`DUPLICATE_NAME`、`EMPTY_CONTAINER`、`BREAK_OUTSIDE_LOOP`、`WHILE_NO_CONDITION`、`FOREACH_ITEMS_NOT_ARRAY`、`BRANCH_NO_TARGET`、`CROSS_CONTAINER_EDGE`、`CYCLE`、`UNKNOWN_OPERATOR`，以及会话补充规则（`SESSION_TYPE_MISMATCH`、`SESSION_NOT_UPSTREAM`、`AGENT_NO_MODEL`、`FORK_UNUSED`、`SESSION_CONCURRENT_WRITE`）。扩展可再挂自己的规则。底部「问题」面板可定位节点。
+- **循环容器**：`foreach` / `while` 新建时自动带 `loop-start`；节点可拖入拖出；`break` 只能放在容器内。从容器内部拉线：落在容器空白处在容器内新建节点，落到容器外的节点上即连出去，落到容器外空白处则在容器外新建。容器外可以连到体内节点，也可以落到容器身上连到循环入口。
+- **校验引擎**（画布变更后约 300ms 防抖）：`NO_START`、`UNREACHABLE`、`DEAD_END`、`MISSING_REQUIRED`、`UNKNOWN_REFERENCE`、`REFERENCE_NOT_UPSTREAM`、`TYPE_MISMATCH`、`DUPLICATE_NAME`、`EMPTY_CONTAINER`、`BREAK_OUTSIDE_LOOP`、`WHILE_NO_CONDITION`、`FOREACH_ITEMS_NOT_ARRAY`、`BRANCH_NO_TARGET`、`CYCLE`、`UNKNOWN_OPERATOR`，以及会话补充规则（`SESSION_TYPE_MISMATCH`、`SESSION_NOT_UPSTREAM`、`AGENT_NO_MODEL`、`FORK_UNUSED`、`SESSION_CONCURRENT_WRITE`）。扩展可再挂自己的规则。底部「问题」面板可定位节点。
 - **变量引用**：`{{Node.var}}`（节点名 + 输出变量）；全局 `{{sys.query}}` / `{{sys.files}}` / `{{sys.now}}`；start 入参按该 start 的节点名暴露。属性面板的 `variable` 字段为选择器，`template` / `expression` 可插入变量。
 - **有序出口**：同一节点多条出边可在端口上拖动换位（属性面板「下游顺序」亦可）；`+` 小球始终可拉新线。把连线拖到目标节点本体松手即连接；拖到空白处弹出算子选择器。
 - **输出变量**：节点卡片底部列出该节点暴露给下游的变量名（含 `start.inputs` / `dataset.fields` 声明的字段）；属性面板给出 `{{节点名.变量}}` 形式的引用。它与出边数量无关。

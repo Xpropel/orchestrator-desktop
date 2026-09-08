@@ -41,18 +41,29 @@ export function collectDanglingEdgeIds(nodes: FlowNode[], edges: FlowEdge[]): st
   return dangling
 }
 
+/** 仓库里是否已有同一对端点（按逻辑 handle，忽略 `start#new` / `start#1`）。 */
+export function hasMatchingConnection(
+  edges: FlowEdge[],
+  connection: Pick<FlowConnection, 'source' | 'sourceHandle' | 'target'>
+): boolean {
+  if (!connection.source || !connection.target) return false
+  const handle = logicalHandleId(connection.sourceHandle) ?? HANDLE_START
+  return edges.some(
+    (edge) =>
+      edge.source === connection.source &&
+      edge.target === connection.target &&
+      (logicalHandleId(edge.sourceHandle) ?? HANDLE_START) === handle
+  )
+}
+
 export function isDuplicateConnection(
   edges: FlowEdge[],
   connection: Pick<FlowConnection, 'source' | 'sourceHandle' | 'target'>
 ): boolean {
-  return edges.some(
-    (edge) =>
-      edge.source === connection.source &&
-      (edge.sourceHandle ?? null) === (connection.sourceHandle ?? null) &&
-      edge.target === connection.target
-  )
+  return hasMatchingConnection(edges, connection)
 }
 
+/** 是否同属一个父容器。跨容器连线已允许，此函数只作归属判断。 */
 export function sameContainerBoundary(source: FlowNode, target: FlowNode): boolean {
   return (source.parentId ?? null) === (target.parentId ?? null)
 }
@@ -112,7 +123,6 @@ export function explainInvalidConnection(
     return '不能连接：不能连到开始节点'
   }
   if (sourceKind === 'end' || sourceKind === 'break') return '不能连接：该节点没有出口'
-  if (!sameContainerBoundary(source, target)) return '不能连接：不能跨容器'
   if (isDuplicateConnection(edges, connection)) return '不能连接：重复的连线'
   if (wouldCreateCycle(nodes, edges, connection)) return '不能连接：会形成环'
   return null

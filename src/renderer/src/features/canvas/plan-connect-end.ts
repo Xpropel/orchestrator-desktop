@@ -10,8 +10,6 @@ import {
   pointHitsNode
 } from '@/features/canvas/drop-target'
 
-export const LEAVE_CONTAINER_TOAST = '不能连接：循环体内的连线不能离开容器'
-
 export type ConnectEndPlan =
   | { kind: 'none' }
   | { kind: 'toast'; message: string }
@@ -49,8 +47,6 @@ export function planConnectEnd(input: {
   alreadyConnected?: boolean
 }): ConnectEndPlan {
   if (input.alreadyConnected) return { kind: 'none' }
-  // 松在起点自身（含点了一下 + 出口）是取消，不是在自己身上新建算子。
-  if (pointHitsNode(input.point, input.nodes, input.sourceId)) return { kind: 'none' }
 
   const picked = pickDropTargetNode(input.point, input.nodes, input.sourceId)
   const fallback =
@@ -71,8 +67,11 @@ export function planConnectEnd(input: {
     return { kind: 'connect', connection }
   }
 
+  // 松在起点自身（含点了一下 + 出口）是取消。子节点叠在容器框内，必须先命中更深的落点。
+  if (pointHitsNode(input.point, input.nodes, input.sourceId)) return { kind: 'none' }
+
   if (dropLeavesContainer(input.point, input.nodes, input.sourceId)) {
-    return { kind: 'toast', message: LEAVE_CONTAINER_TOAST }
+    return { kind: 'picker', parentId: null }
   }
 
   return { kind: 'picker', parentId: input.sourceParentId }

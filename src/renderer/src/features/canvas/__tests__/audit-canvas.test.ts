@@ -3,7 +3,7 @@ import { createOperatorNode, createStartNode } from '@/core/graph'
 import { HANDLE_END, HANDLE_START, logicalHandleId } from '@/core/handles'
 import { loadLibrary } from '@/core/library'
 import type { FlowEdge, FlowNode } from '@/core/types'
-import { LEAVE_CONTAINER_TOAST, planConnectEnd, planPickerConnect } from '../plan-connect-end'
+import { planConnectEnd, planPickerConnect } from '../plan-connect-end'
 import { planAddAtViewportCenter } from '../plan-add-node'
 import { nextSelectedIds, planNodeClick, selectionChangesFor } from '../plan-node-click'
 import { REACT_FLOW_DELETE_KEY_CODE } from '../canvas'
@@ -38,7 +38,7 @@ const agent = node('a', { position: { x: 200, y: 0 }, width: 240, height: 80 })
 const other = node('b', { position: { x: 500, y: 0 }, width: 240, height: 80 })
 
 describe('planConnectEnd', () => {
-  it('cancels when React Flow already accepted the handle drop', () => {
+  it('cancels when the same edge is already stored', () => {
     expect(
       planConnectEnd({
         point: { x: 560, y: 40 },
@@ -51,6 +51,24 @@ describe('planConnectEnd', () => {
         alreadyConnected: true
       })
     ).toEqual({ kind: 'none' })
+  })
+
+  it('still connects when React Flow only reports a valid hover', () => {
+    expect(
+      planConnectEnd({
+        point: { x: 560, y: 40 },
+        nodes: [start, agent, other],
+        edges: [],
+        sourceId: 'a',
+        sourceParentId: null,
+        sourceHandle: HANDLE_START,
+        toNodeId: 'b',
+        alreadyConnected: false
+      })
+    ).toEqual({
+      kind: 'connect',
+      connection: { source: 'a', sourceHandle: HANDLE_START, target: 'b', targetHandle: HANDLE_END }
+    })
   })
 
   it('cancels a drop on the source body instead of opening the picker', () => {
@@ -194,7 +212,7 @@ describe('planConnectEnd', () => {
     ).toEqual({ kind: 'picker', parentId: 'loop' })
   })
 
-  it('toasts when a loop-body connection is dropped outside the container', () => {
+  it('opens a root picker when a loop-body connection is dropped outside the container', () => {
     const box = node('loop', {
       type: 'containerNode',
       position: { x: 100, y: 100 },
@@ -212,7 +230,7 @@ describe('planConnectEnd', () => {
         sourceParentId: 'loop',
         sourceHandle: HANDLE_START
       })
-    ).toEqual({ kind: 'toast', message: LEAVE_CONTAINER_TOAST })
+    ).toEqual({ kind: 'picker', parentId: null })
   })
 
   it('cancels dropping a container outgoing port onto its own body', () => {
@@ -235,7 +253,57 @@ describe('planConnectEnd', () => {
     ).toEqual({ kind: 'none' })
   })
 
-  it('toasts a cross-container body drop instead of opening the picker', () => {
+  it('connects a container outgoing port onto a child inside its body', () => {
+    const box = node('loop', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300,
+      data: { label: 'foreach', name: 'loop', form: {} }
+    })
+    const inner = node('inner', { parentId: 'loop', position: { x: 40, y: 60 }, width: 240, height: 80 })
+    expect(
+      planConnectEnd({
+        point: { x: 160, y: 100 },
+        nodes: [start, box, inner],
+        edges: [],
+        sourceId: 'loop',
+        sourceParentId: null,
+        sourceHandle: HANDLE_START
+      })
+    ).toEqual({
+      kind: 'connect',
+      connection: { source: 'loop', sourceHandle: HANDLE_START, target: 'inner', targetHandle: HANDLE_END }
+    })
+  })
+
+  it('connects a container to a child when React Flow reports the parent as toNode', () => {
+    const box = node('loop', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300,
+      data: { label: 'foreach', name: 'loop', form: {} }
+    })
+    const inner = node('inner', { parentId: 'loop', position: { x: 40, y: 60 }, width: 240, height: 80 })
+    expect(
+      planConnectEnd({
+        point: { x: 160, y: 100 },
+        nodes: [start, box, inner],
+        edges: [],
+        sourceId: 'loop',
+        sourceParentId: null,
+        sourceHandle: HANDLE_START,
+        toNodeId: 'loop',
+        alreadyConnected: false
+      })
+    ).toEqual({
+      kind: 'connect',
+      connection: { source: 'loop', sourceHandle: HANDLE_START, target: 'inner', targetHandle: HANDLE_END }
+    })
+  })
+
+  it('connects a loop-body source onto a node outside the container', () => {
     const box = node('loop', {
       type: 'containerNode',
       position: { x: 0, y: 0 },
@@ -253,7 +321,34 @@ describe('planConnectEnd', () => {
       sourceParentId: 'loop',
       sourceHandle: HANDLE_START
     })
-    expect(plan).toEqual({ kind: 'toast', message: '不能连接：不能跨容器' })
+    expect(plan).toEqual({
+      kind: 'connect',
+      connection: { source: 'inner', sourceHandle: HANDLE_START, target: 'out', targetHandle: HANDLE_END }
+    })
+  })
+
+  it('connects an outside source onto a node inside the container', () => {
+    const box = node('loop', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300,
+      data: { label: 'foreach', name: 'loop', form: {} }
+    })
+    const inner = node('inner', { parentId: 'loop', position: { x: 40, y: 60 }, width: 240, height: 80 })
+    const outside = node('out', { position: { x: 500, y: 40 }, width: 240, height: 80 })
+    const plan = planConnectEnd({
+      point: { x: 80, y: 80 },
+      nodes: [box, inner, outside],
+      edges: [],
+      sourceId: 'out',
+      sourceParentId: null,
+      sourceHandle: HANDLE_START
+    })
+    expect(plan).toEqual({
+      kind: 'connect',
+      connection: { source: 'out', sourceHandle: HANDLE_START, target: 'inner', targetHandle: HANDLE_END }
+    })
   })
 })
 

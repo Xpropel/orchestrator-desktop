@@ -64,7 +64,7 @@ describe('audit validate: containers and reachability', () => {
     expect(issues(nodes, edges, 'BREAK_OUTSIDE_LOOP')).toHaveLength(0)
   })
 
-  it('allows container ↔ child edges and flags true cross-container edges', () => {
+  it('allows container ↔ child edges and in/out crossing edges', () => {
     const loop = node('loop', 'foreach', 'Loop_1', { items: '{{sys.files}}' })
     const loopStart = node('loop:start', 'loop-start', 'LoopStart_1', {}, { parentId: 'loop' })
     const inner = node('m', 'message', 'Msg_1', { content: 'x' }, { parentId: 'loop' })
@@ -79,10 +79,10 @@ describe('audit validate: containers and reachability', () => {
     expect(
       issues(
         [start(), loop, loopStart, inner, outside],
-        [edge('s', 'loop'), edge('m', 'e')],
+        [edge('s', 'loop'), edge('m', 'e'), edge('s', 'm')],
         'CROSS_CONTAINER_EDGE'
       )
-    ).toHaveLength(1)
+    ).toHaveLength(0)
   })
 
   it('does not treat a loop body cycle as a top-level CYCLE', () => {

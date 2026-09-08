@@ -220,7 +220,7 @@ export function validateFlow(nodes, edges): FlowIssue[]
 `MISSING_REQUIRED`（required 参数为空，error）、`UNKNOWN_REFERENCE`（引用的节点/变量不存在，error）、
 `REFERENCE_NOT_UPSTREAM`（引用了不在上游的节点，error）、`TYPE_MISMATCH`（variable 字段类型不兼容，error）、
 `DUPLICATE_NAME`、`EMPTY_CONTAINER`（容器无子节点，warning）、`BREAK_OUTSIDE_LOOP`、`WHILE_NO_CONDITION`、
-`FOREACH_ITEMS_NOT_ARRAY`、`BRANCH_NO_TARGET`（某 case 无出边，warning）、`CROSS_CONTAINER_EDGE`、`CYCLE`（容器外成环）。
+`FOREACH_ITEMS_NOT_ARRAY`、`BRANCH_NO_TARGET`（某 case 无出边，warning）、`CYCLE`（容器外成环）。容器内外可以互连，不再报 `CROSS_CONTAINER_EDGE`。
 校验在 nodes/edges/form 变化后 300ms 防抖执行，结果放 `state/validation-store.ts`；
 底部「问题」面板列出并可点击定位节点；节点右上角红/黄圆点徽标显示问题数。
 
@@ -228,7 +228,7 @@ export function validateFlow(nodes, edges): FlowIssue[]
 
 - 容器节点 `containerNode`：可 `NodeResizer`（最小 360×220），内部有标题栏 + 虚线区域；`loopStartNode` 固定在左上。
 - 从侧栏拖入或拖动节点到容器内部区域 → 自动设 `parentId` 并把坐标换算为相对坐标；拖出容器 → 清 `parentId`（用 `getIntersectingNodes` 在 `onNodeDragStop` 判定）。
-- 禁止容器嵌套容器（阶段 5）；禁止跨容器边界连线；`break` 只能落在容器内。
+- 禁止容器嵌套容器（阶段 5）；容器内外可以互连（体内可连出、体外可连入）；`break` 只能落在容器内。
 - 删除容器级联删除子节点（`loopStartNode` 不可单独删除/复制）；复制容器连子节点一起复制（id 重映射，`parentId` 同步）。
 - 容器内新建节点（从容器内节点右键/拖线追加）自动继承 `parentId`。
 - DSL：子节点在 `components` 中**平铺**为独立条目并带 `parent_id: containerId`（与 RAGFlow 字段名一致）；

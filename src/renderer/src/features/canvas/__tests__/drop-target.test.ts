@@ -56,6 +56,7 @@ describe('pickDropTargetNode', () => {
       height: 80
     })
     expect(pickDropTargetNode({ x: 80, y: 90 }, [box, child])?.id).toBe('child')
+    expect(pickDropTargetNode({ x: 80, y: 90 }, [box, child], 'loop')?.id).toBe('child')
   })
 
   it('prefers the later sibling when two top-level boxes overlap', () => {

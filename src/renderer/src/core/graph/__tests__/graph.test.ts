@@ -21,6 +21,7 @@ import {
   resolveParentAfterDrag,
   flowCenterFromViewport,
   explainInvalidConnection,
+  hasMatchingConnection,
   isValidFlowConnection,
   nextNodeName,
   normalizeFlowConnection,
@@ -116,13 +117,14 @@ describe('isValidFlowConnection', () => {
     expect(isValidFlowConnection(nodes, [edge('e1', 'a', 'b')], connection('b', 'a'))).toBe(false)
   })
 
-  it('accepts a new legal edge and rejects cross-container edges', () => {
+  it('accepts a new legal edge and allows in/out of a container', () => {
     expect(isValidFlowConnection(nodes, [], connection('a', 'b'))).toBe(true)
     const boxed = [
       ...nodes,
       node('inside', 'agent', { id: 'inside', type: 'taskNode', parentId: 'loop' })
     ]
-    expect(isValidFlowConnection(boxed, [], connection('a', 'inside'))).toBe(false)
+    expect(isValidFlowConnection(boxed, [], connection('a', 'inside'))).toBe(true)
+    expect(isValidFlowConnection(boxed, [], connection('inside', 'b'))).toBe(true)
   })
 
   it('treats physical start ports as the logical start handle', () => {
@@ -131,6 +133,18 @@ describe('isValidFlowConnection', () => {
     expect(explainInvalidConnection(nodes, [edge('e1', 'a', 'b')], connection('b', 'a', 'start#new'))).toBe(
       '不能连接：会形成环'
     )
+  })
+})
+
+describe('hasMatchingConnection', () => {
+  it('matches a stored start edge against start#new and ignores a hover without a stored edge', () => {
+    expect(
+      hasMatchingConnection([edge('e1', 'a', 'b')], { source: 'a', target: 'b', sourceHandle: 'start#new' })
+    ).toBe(true)
+    expect(hasMatchingConnection([], { source: 'a', target: 'b', sourceHandle: 'start' })).toBe(false)
+    expect(
+      hasMatchingConnection([edge('e1', 'a', 'b')], { source: 'a', target: null, sourceHandle: 'start' })
+    ).toBe(false)
   })
 })
 

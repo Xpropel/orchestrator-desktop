@@ -63,7 +63,7 @@ export function isSourceOrAncestor(nodes: FlowNode[], sourceId: string, candidat
   return ancestorChain(sourceId, new Map(nodes.map((node) => [node.id, node]))).has(candidateId)
 }
 
-/** 起点在容器内、落点却在该容器框之外：循环体内的连线不能离开容器，也就不能在容器外新建节点。 */
+/** 起点在容器内、落点却在该容器框之外：在容器外新建节点或接到容器外的组件。 */
 export function dropLeavesContainer(point: XYPosition, nodes: FlowNode[], sourceId: string): boolean {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const parentId = byId.get(sourceId)?.parentId

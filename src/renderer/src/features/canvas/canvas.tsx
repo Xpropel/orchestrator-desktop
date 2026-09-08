@@ -27,6 +27,7 @@ import { planConnectEnd, planPickerConnect } from '@/features/canvas/plan-connec
 import { nextSelectedIds, planNodeClick, selectionChangesFor } from '@/features/canvas/plan-node-click'
 import {
   findContainingContainer,
+  hasMatchingConnection,
   isProtectedNode,
   isStartNode,
   isValidFlowConnection,
@@ -201,7 +202,13 @@ function FlowCanvas(): JSX.Element {
         sourceParentId: typeof from.parentId === 'string' ? from.parentId : null,
         sourceHandle,
         toNodeId: connectionState.toNode?.id,
-        alreadyConnected: connectionState.isValid === true
+        // isValid 只表示悬停看起来合法。从容器连到体内子节点时，React Flow
+        // 常报 isValid 却不触发 onConnect；必须以仓库里是否已有这条边为准。
+        alreadyConnected: hasMatchingConnection(state.edges, {
+          source: from.id,
+          sourceHandle,
+          target: connectionState.toNode?.id ?? null
+        })
       })
       if (plan.kind === 'none') return
       if (plan.kind === 'toast') {

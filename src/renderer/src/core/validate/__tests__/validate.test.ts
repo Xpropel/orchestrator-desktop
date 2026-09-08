@@ -205,8 +205,9 @@ describe('validateFlow section 5', () => {
     const loop = node('c', 'foreach', 'For_1', { items: '{{sys.files}}' })
     const inner = node('n', 'message', 'Msg_1', { content: 'x' }, { parentId: 'c' })
     const outside = node('o', 'end', 'End_1')
-    expect(codes([start(), loop, inner, outside], [edge('s', 'c'), edge('n', 'o')], 'CROSS_CONTAINER_EDGE')).toBe(1)
+    expect(codes([start(), loop, inner, outside], [edge('s', 'c'), edge('n', 'o')], 'CROSS_CONTAINER_EDGE')).toBe(0)
     expect(codes([start(), loop, inner, outside], [edge('s', 'c'), edge('c', 'o')], 'CROSS_CONTAINER_EDGE')).toBe(0)
+    expect(codes([start(), loop, inner, outside], [edge('s', 'n'), edge('n', 'o')], 'CROSS_CONTAINER_EDGE')).toBe(0)
   })
 
   it('CYCLE', () => {

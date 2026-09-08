@@ -12,27 +12,9 @@ import { dropIds, pushSnapshot, replaceTopSnapshot, syncDirtyFromSnapshot, unwra
 import { flushFormHistory } from './history-slice'
 import type { ContainerSlice } from './flow-state'
 
-function parentOf(node: FlowNode): string | null {
-  return typeof node.parentId === 'string' && node.parentId.length > 0 ? node.parentId : null
-}
-
-/** 与 CROSS_CONTAINER_EDGE 一致：同父、或一端是另一端的直接容器，才保留。 */
-function isCrossContainerEdge(nodes: FlowNode[], edge: FlowEdge): boolean {
-  const source = nodes.find((item) => item.id === edge.source)
-  const target = nodes.find((item) => item.id === edge.target)
-  if (!source || !target) return false
-  const sourceParent = parentOf(source)
-  const targetParent = parentOf(target)
-  if (sourceParent === targetParent) return false
-  if (targetParent === source.id || sourceParent === target.id) return false
-  return true
-}
-
-export function dropCrossContainerEdges(state: { nodes: FlowNode[]; edges: FlowEdge[] }): void {
-  const next = state.edges.filter((edge) => !isCrossContainerEdge(state.nodes, edge))
-  if (next.length !== state.edges.length) {
-    state.edges = next
-  }
+/** 容器内外互连合法；拖入 / 拖出时不再拆掉跨边界的边。 */
+export function dropCrossContainerEdges(_state: { nodes: FlowNode[]; edges: FlowEdge[] }): void {
+  return
 }
 
 export function ensureLoopStart(state: { nodes: FlowNode[] }, node: FlowNode): void {

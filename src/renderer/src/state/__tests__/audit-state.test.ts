@@ -362,7 +362,7 @@ describe('audit-state', () => {
     expect(useFlowStore.getState().savedSnapshotKey).toBe('')
   })
 
-  it('setNodeParent drops cross-container edges and keeps container/sibling edges in one history step', () => {
+  it('setNodeParent keeps in/out edges and container/sibling edges in one history step', () => {
     const box = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
     useFlowStore.getState().addNode(box)
     const sibling = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
@@ -414,8 +414,8 @@ describe('audit-state', () => {
     expect(useFlowStore.getState().nodes.find((node) => node.id === task.id)?.parentId).toBe(box.id)
 
     const edges = useFlowStore.getState().edges
-    expect(edges.some((edge) => edge.source === 'start' && edge.target === task.id)).toBe(false)
-    expect(edges.some((edge) => edge.source === task.id && edge.target === outsider.id)).toBe(false)
+    expect(edges.some((edge) => edge.source === 'start' && edge.target === task.id)).toBe(true)
+    expect(edges.some((edge) => edge.source === task.id && edge.target === outsider.id)).toBe(true)
     expect(edges.some((edge) => edge.source === 'start' && edge.target === box.id)).toBe(true)
     expect(edges.some((edge) => edge.source === box.id && edge.target === task.id)).toBe(true)
     expect(edges.some((edge) => edge.source === `${box.id}:start` && edge.target === sibling.id)).toBe(true)
