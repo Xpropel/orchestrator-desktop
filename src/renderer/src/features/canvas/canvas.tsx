@@ -39,7 +39,12 @@ import {
 } from '@/core/graph'
 import { getOperator, getTargetHandles, hasOperator } from '@/core/registry'
 import { HANDLE_END, HANDLE_START, logicalHandleId } from '@/core/handles'
-import { isSourceOrAncestor, mergeNodeMetrics, pickDropTargetNode } from '@/features/canvas/drop-target'
+import {
+  dropLeavesContainer,
+  isSourceOrAncestor,
+  mergeNodeMetrics,
+  pickDropTargetNode
+} from '@/features/canvas/drop-target'
 import {
   toCanvasEdges,
   toCanvasNode,
@@ -247,6 +252,10 @@ function FlowCanvas(): JSX.Element {
         } else {
           useFlowStore.getState().onConnect(connection)
         }
+        return
+      }
+      if (dropLeavesContainer(flowPos, measured, from.id)) {
+        useUiStore.getState().showToast('不能连接：循环体内的连线不能离开容器')
         return
       }
       const parentId = typeof from.parentId === 'string' ? from.parentId : null

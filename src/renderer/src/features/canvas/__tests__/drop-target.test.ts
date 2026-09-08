@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FlowNode } from '@/core/types'
-import { isSourceOrAncestor, mergeNodeMetrics, pickDropTargetNode } from '../drop-target'
+import { dropLeavesContainer, isSourceOrAncestor, mergeNodeMetrics, pickDropTargetNode } from '../drop-target'
 
 function node(id: string, extras?: Partial<FlowNode>): FlowNode {
   return {
@@ -96,6 +96,28 @@ describe('pickDropTargetNode', () => {
     it('never returns the source itself', () => {
       expect(pickDropTargetNode({ x: 30, y: 60 }, [box, loopStart, sibling, outside], 'loop:start')).toBeNull()
     })
+  })
+})
+
+describe('dropLeavesContainer', () => {
+  const box = node('loop', {
+    type: 'containerNode',
+    position: { x: 100, y: 100 },
+    width: 400,
+    height: 300,
+    data: { label: 'foreach', name: 'loop', form: {} }
+  })
+  const inner = node('inner', { parentId: 'loop', position: { x: 40, y: 60 }, width: 240, height: 80 })
+  const outside = node('outside', { position: { x: 700, y: 100 } })
+
+  it('flags a drop outside the source container', () => {
+    expect(dropLeavesContainer({ x: 600, y: 200 }, [box, inner, outside], 'inner')).toBe(true)
+    expect(dropLeavesContainer({ x: 200, y: 450 }, [box, inner, outside], 'inner')).toBe(true)
+  })
+
+  it('accepts a drop inside the container and ignores top-level sources', () => {
+    expect(dropLeavesContainer({ x: 300, y: 300 }, [box, inner, outside], 'inner')).toBe(false)
+    expect(dropLeavesContainer({ x: 1000, y: 1000 }, [box, inner, outside], 'outside')).toBe(false)
   })
 })
 

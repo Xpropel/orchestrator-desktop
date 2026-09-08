@@ -52,6 +52,15 @@ export function isSourceOrAncestor(nodes: FlowNode[], sourceId: string, candidat
   return ancestorChain(sourceId, new Map(nodes.map((node) => [node.id, node]))).has(candidateId)
 }
 
+/** 起点在容器内、落点却在该容器框之外：循环体内的连线不能离开容器，也就不能在容器外新建节点。 */
+export function dropLeavesContainer(point: XYPosition, nodes: FlowNode[], sourceId: string): boolean {
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const parentId = byId.get(sourceId)?.parentId
+  const parent = parentId ? byId.get(parentId) : undefined
+  if (!parent) return false
+  return !pointInBox(point, getNodeAbsoluteBox(parent, nodes))
+}
+
 /**
  * 落点命中：排除便签；多层重叠取最深，同深度取更上层（数组更靠后）。
  * 传入 `sourceId` 时，起点自身及其所在的容器不参与命中——这些位置应视为空白，交给新建算子的选择器。
