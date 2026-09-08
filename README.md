@@ -10,12 +10,12 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 
 ## 下载 / Download
 
-预编译包见 [GitHub Releases](https://github.com/Xpropel/orchestrator-desktop/releases/latest)（当前版本 `v0.1.1`）。目前只提供 **Windows x64**：
+预编译包见 [GitHub Releases](https://github.com/Xpropel/orchestrator-desktop/releases/latest)（当前版本 `v0.1.2`）。目前只提供 **Windows x64**：
 
 | 文件 | 说明 |
 | --- | --- |
-| `Orchestrator.Desktop-0.1.1-portable.exe` | 免安装，双击运行 |
-| `Orchestrator.Desktop-0.1.1-setup.exe` | NSIS 安装包，可选安装目录 |
+| `Orchestrator.Desktop-0.1.2-portable.exe` | 免安装，双击运行 |
+| `Orchestrator.Desktop-0.1.2-setup.exe` | NSIS 安装包，可选安装目录 |
 
 可执行文件未代码签名，Windows SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。macOS（`dmg`）与 Linux（`AppImage`）可从源码用 `electron-builder.yml` 中的目标打包，尚未测试。
 
@@ -69,7 +69,7 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 | 位置 | 作用 |
 | --- | --- |
 | `src/renderer/src/core/library/private/*.ts` | `export default` 一个 `LibraryExtension`（类别 / 算子，可选 `rules`、`globals`）。`import.meta.glob` 在构建期发现并并入注册表。 |
-| `examples/private/*.flow.json` + `examples/private/index.json` | 与公开 `examples/index.json` 同结构；清单与流程文件在渲染进程和主进程都会接在公开示例后面。目录不存在时忽略。 |
+| `examples/private/*.flow.json` + `examples/private/index.json` | 与公开 `examples/index.json` 同结构。开发模式渲染进程会合并；生产包不打进 private。Electron 主进程按磁盘合并（asar 已排除该目录）。目录不存在时忽略。 |
 | `docs/private/` | 本地笔记与专属类别说明，不进 Git。 |
 
 `library/private/` 目录本身会进 Git（只提交 `README.md`），因此克隆后 glob 始终有一个目录可扫。
