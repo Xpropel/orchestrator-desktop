@@ -12,7 +12,8 @@ export default defineConfig({
         '@': resolve('src/renderer/src'),
         '@shared': resolve('src/shared'),
         // 内置示例目录；用别名而非相对路径，文件搬家时不会悄悄失效。
-        '@examples': resolve('examples')
+        '@examples': resolve('examples'),
+        '@private': resolve('private')
       }
     },
     plugins: [

@@ -163,10 +163,25 @@ function entriesOf(raw: unknown): ExampleManifestEntry[] {
   return Array.isArray(raw) ? raw.filter(isManifestEntry) : []
 }
 
+function collectManifestEntries(modules: Record<string, unknown>): ExampleManifestEntry[] {
+  const byName = new Map<string, ExampleManifestEntry>()
+  for (const raw of Object.values(modules)) {
+    for (const entry of entriesOf(raw)) {
+      if (!byName.has(entry.name)) byName.set(entry.name, entry)
+    }
+  }
+  return [...byName.values()]
+}
+
 async function readExampleManifest(): Promise<ExampleManifestEntry[]> {
-  const publicEntries = entriesOf(Object.values(publicManifestModules)[0])
+  const publicEntries = collectManifestEntries(publicManifestModules)
   const { manifest } = await loadPrivateExampleModules()
-  const privateEntries = entriesOf(Object.values(manifest)[0])
+  const seen = new Set(publicEntries.map((entry) => entry.name))
+  const privateEntries = collectManifestEntries(manifest).filter((entry) => {
+    if (seen.has(entry.name)) return false
+    seen.add(entry.name)
+    return true
+  })
   return [...publicEntries, ...privateEntries]
 }
 

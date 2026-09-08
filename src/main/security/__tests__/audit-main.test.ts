@@ -220,5 +220,6 @@ describe('packaging', () => {
     const yml = readFileSync(join(__dirname, '../../../../electron-builder.yml'), 'utf8')
     expect(yml).toContain('examples/**/*')
     expect(yml).toContain('!examples/private/**')
+    expect(yml).toContain('!private/**')
   })
 })

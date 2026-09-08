@@ -28,9 +28,19 @@ async function readManifest(rel: string): Promise<ExampleMenuEntry[]> {
   }
 }
 
-/** 读取 `examples/index.json`，再合并可选的 `examples/private/index.json`。 */
+/** 读取公开清单，再合并 gitignore / 私有子模块里的可选清单。 */
 export async function loadExampleManifest(): Promise<ExampleMenuEntry[]> {
   const publicEntries = await readManifest(join('examples', 'index.json'))
-  const privateEntries = await readManifest(join('examples', 'private', 'index.json'))
-  return [...publicEntries, ...privateEntries]
+  const privateEntries = [
+    ...(await readManifest(join('examples', 'private', 'index.json'))),
+    ...(await readManifest(join('private', 'examples', 'index.json')))
+  ]
+  const seen = new Set(publicEntries.map((entry) => entry.name))
+  const extra: ExampleMenuEntry[] = []
+  for (const entry of privateEntries) {
+    if (seen.has(entry.name)) continue
+    seen.add(entry.name)
+    extra.push(entry)
+  }
+  return [...publicEntries, ...extra]
 }

@@ -13,7 +13,8 @@ export default defineConfig({
     alias: {
       '@': resolve(rootDir, 'src/renderer/src'),
       '@shared': resolve(rootDir, 'src/shared'),
-      '@examples': resolve(rootDir, 'examples')
+      '@examples': resolve(rootDir, 'examples'),
+      '@private': resolve(rootDir, 'private')
     }
   },
   server: {

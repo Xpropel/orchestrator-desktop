@@ -6,7 +6,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src/renderer/src'),
       '@shared': path.resolve(__dirname, 'src/shared'),
-      '@examples': path.resolve(__dirname, 'examples')
+      '@examples': path.resolve(__dirname, 'examples'),
+      '@private': path.resolve(__dirname, 'private')
     }
   },
   test: {

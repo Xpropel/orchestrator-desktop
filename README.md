@@ -64,15 +64,25 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 
 ## 扩展：私有类别与示例
 
-公开仓库只带通用算子。本机若要加自己的类别、示例或笔记，放到下列 **gitignore** 目录即可，构建时自动合并，公开 release 不会带上它们：
+GitHub **不能**把公开仓库里的某一个文件夹单独设为私有。自定义算子、示例和笔记放在独立的**私有仓库** [Xpropel/orchestrator-desktop-private](https://github.com/Xpropel/orchestrator-desktop-private)，本仓库用根目录 `private/` **git submodule** 挂上来。没有该仓库权限的人克隆公开仓库时看不到内容；公开 release / asar 也不会打进 `private/`。
+
+有权限时：
+
+```bash
+git clone https://github.com/Xpropel/orchestrator-desktop.git
+git submodule update --init --recursive
+```
+
+本机也可以继续往下列 **gitignore** 目录丢文件（与子模块同时存在时按类别去重，只保留一份）：
 
 | 位置 | 作用 |
 | --- | --- |
-| `src/renderer/src/core/library/private/*.ts` | `export default` 一个 `LibraryExtension`（类别 / 算子，可选 `rules`、`globals`）。`import.meta.glob` 在构建期发现并并入注册表。 |
-| `examples/private/*.flow.json` + `examples/private/index.json` | 与公开 `examples/index.json` 同结构。开发模式渲染进程会合并；生产包不打进 private。Electron 主进程按磁盘合并（asar 已排除该目录）。目录不存在时忽略。 |
-| `docs/private/` | 本地笔记与专属类别说明，不进 Git。 |
+| `private/library/*.ts` | 私有子模块里的 `LibraryExtension`。 |
+| `src/renderer/src/core/library/private/*.ts` | 仅本机的落盘扩展；`import.meta.glob` 在构建期发现并并入注册表。 |
+| `private/examples/` 或 `examples/private/` | 与公开 `examples/index.json` 同结构。开发模式渲染进程会合并；生产包不打进 private。 |
+| `private/docs/` 或 `docs/private/` | 本地 / 私有笔记，不进公开 Git 树。 |
 
-`library/private/` 目录本身会进 Git（只提交 `README.md`），因此克隆后 glob 始终有一个目录可扫。
+`library/private/` 目录本身会进公开 Git（只提交 `README.md`），因此克隆后 glob 始终有一个目录可扫。
 
 最小扩展（通过 `satisfies LibraryExtension` 对齐真实契约）：
 

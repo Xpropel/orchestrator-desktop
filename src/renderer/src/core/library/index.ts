@@ -1,10 +1,11 @@
 import { registerLibrary } from '../registry'
 import type { OperatorCategory, OperatorDefinition, OperatorLibrary } from '../schema'
 import { BUILTIN_CATEGORIES, BUILTIN_OPERATORS } from './builtin'
-import type { ExtensionRule, GlobalsSection, LibraryExtension } from './extension'
+import { uniqueExtensions, type ExtensionRule, type GlobalsSection, type LibraryExtension } from './extension'
 import { LLM_OPERATORS } from './llm'
 
 export type { ExtensionRule, ExtensionRuleContext, GlobalsSection, LibraryExtension } from './extension'
+export { uniqueExtensions } from './extension'
 
 export const builtinLibrary: OperatorLibrary = {
   version: 1,
@@ -18,11 +19,12 @@ export function mergeExtensions(list: LibraryExtension[]): {
   rules: ExtensionRule[]
   globals: GlobalsSection[]
 } {
+  const unique = uniqueExtensions(list)
   return {
-    categories: list.flatMap((item) => item.categories),
-    operators: list.flatMap((item) => item.operators),
-    rules: list.flatMap((item) => item.rules ?? []),
-    globals: list.flatMap((item) => item.globals ?? [])
+    categories: unique.flatMap((item) => item.categories),
+    operators: unique.flatMap((item) => item.operators),
+    rules: unique.flatMap((item) => item.rules ?? []),
+    globals: unique.flatMap((item) => item.globals ?? [])
   }
 }
 
@@ -33,10 +35,10 @@ function isLibraryExtension(value: unknown): value is LibraryExtension {
 }
 
 function readDiscoveredExtensions(): LibraryExtension[] {
-  const modules = import.meta.glob('./private/*.ts', { eager: true }) as Record<
-    string,
-    { default?: unknown }
-  >
+  const modules = {
+    ...import.meta.glob('./private/*.ts', { eager: true }),
+    ...import.meta.glob('@private/library/*.ts', { eager: true })
+  } as Record<string, { default?: unknown }>
   const list: LibraryExtension[] = []
   for (const [path, mod] of Object.entries(modules)) {
     if (!mod || mod.default === undefined) {

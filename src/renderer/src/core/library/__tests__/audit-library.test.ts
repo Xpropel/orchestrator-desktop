@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ICON_NAME_SET } from '../../icons'
+import { uniqueExtensions, type LibraryExtension } from '../extension'
 import { builtinLibrary, loadLibrary } from '../index'
 import { LLM_OPERATORS } from '../llm'
 import { VAR_TYPES } from '../../schema'
@@ -179,6 +180,22 @@ describe('audit registry', () => {
     expect(new Set(first).size).toBe(first.length)
     expect(first.at(-1)).toBe('else')
     expect(first).toContain('c1')
+  })
+})
+
+describe('uniqueExtensions', () => {
+  it('keeps the first copy when the same exclusive category is loaded twice', () => {
+    const first = {
+      categories: [{ key: 'demo', title: 'Demo', order: 1 }],
+      operators: [{ type: 'demo.a' }]
+    }
+    const second = {
+      categories: [{ key: 'demo', title: 'Demo copy', order: 1 }],
+      operators: [{ type: 'demo.a' }, { type: 'demo.b' }]
+    }
+    const merged = uniqueExtensions([first, second] as unknown as LibraryExtension[])
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toBe(first)
   })
 })
 
