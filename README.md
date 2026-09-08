@@ -14,8 +14,8 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 
 | 文件 | 说明 |
 | --- | --- |
-| `Orchestrator Desktop-0.1.3-mac-arm64.dmg` | macOS Apple Silicon（M 系列），拖到「应用程序」 |
-| `Orchestrator Desktop-0.1.3-mac-arm64.zip` | 同上，解压即用 |
+| `Orchestrator.Desktop-0.1.3-mac-arm64.dmg` | macOS Apple Silicon（M 系列），拖到「应用程序」 |
+| `Orchestrator.Desktop-0.1.3-mac-arm64.zip` | 同上，解压即用 |
 | [`Orchestrator.Desktop-0.1.1-setup.exe`](https://github.com/Xpropel/orchestrator-desktop/releases/tag/v0.1.1) | Windows x64，NSIS 安装包（当前仍为 v0.1.1） |
 | [`Orchestrator.Desktop-0.1.1-portable.exe`](https://github.com/Xpropel/orchestrator-desktop/releases/tag/v0.1.1) | Windows x64，免安装（当前仍为 v0.1.1） |
 
