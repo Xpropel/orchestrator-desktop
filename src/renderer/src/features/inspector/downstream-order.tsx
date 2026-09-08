@@ -1,29 +1,16 @@
-import { useState, type DragEvent, type JSX } from 'react'
+import { useMemo, useState, type DragEvent, type JSX } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
-import { outgoingStartEdges } from '@/core/graph'
+import { downstreamRows } from '@/core/graph'
 import { Button } from '@/ui/button'
 import { cn } from '@/ui/cn'
 import { useFlowStore } from '@/state/flow-store'
 
-interface DownstreamRow {
-  edgeId: string
-  index: number
-  name: string
-}
-
 export function DownstreamOrder({ nodeId }: { nodeId: string }): JSX.Element | null {
-  const rows = useFlowStore(
-    useShallow((state) => {
-      const outgoing = outgoingStartEdges(state.edges, nodeId)
-      if (outgoing.length < 2) return [] as DownstreamRow[]
-      return outgoing.map((edge, index) => ({
-        edgeId: edge.id,
-        index,
-        name: state.nodes.find((node) => node.id === edge.target)?.data.name ?? edge.target
-      }))
-    })
-  )
+  // 只订阅 store 里的原始切片（引用稳定），派生行在 useMemo 里做。
+  // 若在 selector 中直接 map 出新对象，useSyncExternalStore 每次都会拿到新快照而无限重渲染。
+  const edges = useFlowStore((state) => state.edges)
+  const nodes = useFlowStore((state) => state.nodes)
+  const rows = useMemo(() => downstreamRows(edges, nodes, nodeId), [edges, nodes, nodeId])
   const moveOutgoingEdge = useFlowStore((state) => state.moveOutgoingEdge)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)

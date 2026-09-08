@@ -1,5 +1,11 @@
 import { HANDLE_START, isLogicalStartHandle, logicalHandleId } from '../handles'
-import type { FlowEdge } from '../types'
+import type { FlowEdge, FlowNode } from '../types'
+
+export interface DownstreamRow {
+  edgeId: string
+  index: number
+  name: string
+}
 
 export function outgoingGroupKey(edge: FlowEdge): string {
   return `${edge.source}\0${logicalHandleId(edge.sourceHandle) ?? HANDLE_START}`
@@ -7,6 +13,17 @@ export function outgoingGroupKey(edge: FlowEdge): string {
 
 export function outgoingStartEdges(edges: FlowEdge[], nodeId: string): FlowEdge[] {
   return edges.filter((edge) => edge.source === nodeId && isLogicalStartHandle(edge.sourceHandle))
+}
+
+/** 属性面板「下游顺序」列表：少于两条出边时无需排序，返回空数组。 */
+export function downstreamRows(edges: FlowEdge[], nodes: FlowNode[], nodeId: string): DownstreamRow[] {
+  const outgoing = outgoingStartEdges(edges, nodeId)
+  if (outgoing.length < 2) return []
+  return outgoing.map((edge, index) => ({
+    edgeId: edge.id,
+    index,
+    name: nodes.find((node) => node.id === edge.target)?.data.name ?? edge.target
+  }))
 }
 
 /** 在同一 `(source, sourceHandle)` 组内重排，其它边的相对位置不变。 */

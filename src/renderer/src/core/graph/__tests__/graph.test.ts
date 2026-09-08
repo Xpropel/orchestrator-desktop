@@ -10,6 +10,7 @@ import {
   collectDescendantIds,
   createOperatorNode,
   createStartNode,
+  downstreamRows,
   expandCopyIds,
   extractSubgraph,
   findContainingContainer,
@@ -164,6 +165,30 @@ describe('reorderOutgoingEdges', () => {
     ]
     const next = reorderOutgoingEdges(edges, 'e3', 0)
     expect(next.map((item) => item.id)).toEqual(['x', 'e3', 'y', 'e1', 'e2'])
+  })
+})
+
+describe('downstreamRows', () => {
+  const nodes = [
+    node('ds', 'dataset', { data: { label: 'dataset', name: '母数据集', form: {} } }),
+    node('a', 'dataset', { data: { label: 'dataset', name: '子集 A', form: {} } }),
+    node('b', 'dataset', { data: { label: 'dataset', name: '子集 B', form: {} } })
+  ]
+
+  it('lists a dataset fan-out in edge order with target names', () => {
+    const edges = [edge('e1', 'ds', 'a'), edge('e2', 'ds', 'b'), edge('e3', 'ds', 'missing')]
+    expect(downstreamRows(edges, nodes, 'ds')).toEqual([
+      { edgeId: 'e1', index: 0, name: '子集 A' },
+      { edgeId: 'e2', index: 1, name: '子集 B' },
+      { edgeId: 'e3', index: 2, name: 'missing' }
+    ])
+  })
+
+  it('is empty below two start edges and ignores branch handles', () => {
+    expect(downstreamRows([edge('e1', 'ds', 'a')], nodes, 'ds')).toEqual([])
+    expect(downstreamRows([edge('e1', 'ds', 'a', 'true'), edge('e2', 'ds', 'b', 'false')], nodes, 'ds')).toEqual(
+      []
+    )
   })
 })
 

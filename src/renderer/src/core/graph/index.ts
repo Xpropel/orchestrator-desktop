@@ -45,7 +45,13 @@ export {
 } from './create-node'
 export { idsProtectedFromRemoval, isContainerNode, isLoopStartNode, isProtectedNode, isStartNode } from './kind'
 export { createNodeId, nextNodeName } from './naming'
-export { outgoingGroupKey, outgoingStartEdges, reorderOutgoingEdges } from './outgoing-order'
+export {
+  type DownstreamRow,
+  downstreamRows,
+  outgoingGroupKey,
+  outgoingStartEdges,
+  reorderOutgoingEdges
+} from './outgoing-order'
 export {
   type GraphSnapshot,
   EDGE_RUNTIME_KEYS,
