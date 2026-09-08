@@ -3,8 +3,10 @@ import { LayoutTemplate, Maximize2, Redo2, StickyNote, Undo2 } from 'lucide-reac
 import { useAddNode } from '@/features/canvas/use-add-node'
 import { runAutoLayout } from '@/features/canvas/run-auto-layout'
 import { ACTION_LABEL, labeledShortcut } from '@shared/action-labels'
+import { fileApi } from '@/platform/platform'
 import { cn } from '@/ui/cn'
 import { useFlowStore } from '@/state/flow-store'
+import { canvasPanHint } from './pointer-behavior'
 
 export const CanvasToolbar = memo(function CanvasToolbar(): JSX.Element {
   const undo = useFlowStore((state) => state.undo)
@@ -16,7 +18,10 @@ export const CanvasToolbar = memo(function CanvasToolbar(): JSX.Element {
 
   return (
     // 底部居中：左上让给组件栏，右上让给属性面板，左下/右下是 React Flow 的缩放控件与小地图。
-    <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-md border border-border bg-panel/80 p-0.5 shadow-lg backdrop-blur-md">
+    <div
+      title={canvasPanHint(fileApi.platform)}
+      className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-md border border-border bg-panel/80 p-0.5 shadow-lg backdrop-blur-md"
+    >
       <IconButton title={labeledShortcut('undo')} disabled={!canUndo} onClick={undo}>
         <Undo2 className="h-3.5 w-3.5" />
       </IconButton>

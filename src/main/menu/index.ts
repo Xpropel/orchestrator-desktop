@@ -1,5 +1,7 @@
-import { Menu, app, dialog, type MenuItemConstructorOptions } from 'electron'
+import { Menu, app, dialog, shell, type MenuItemConstructorOptions } from 'electron'
 import { ACTION_LABEL } from '../../shared/action-labels'
+import { APP_TITLE } from '../../shared/window-title'
+import { isMacPlatform } from '../../shared/platform'
 import type { MenuAction } from '../../preload/index.d'
 import type { ExampleMenuEntry } from '../ipc/examples'
 
@@ -16,16 +18,59 @@ function exampleSubmenu(
   }))
 }
 
-export function createApplicationMenu(
+function showAbout(): void {
+  void dialog.showMessageBox({
+    type: 'info',
+    title: '关于',
+    message: APP_TITLE,
+    detail: `版本 ${app.getVersion()}`
+  })
+}
+
+function macAppMenu(): MenuItemConstructorOptions {
+  return {
+    label: APP_TITLE,
+    submenu: [
+      { label: `关于 ${APP_TITLE}`, click: () => showAbout() },
+      { type: 'separator' },
+      { role: 'services', label: '服务' },
+      { type: 'separator' },
+      { role: 'hide', label: `隐藏 ${APP_TITLE}` },
+      { role: 'hideOthers', label: '隐藏其他' },
+      { role: 'unhide', label: '全部显示' },
+      { type: 'separator' },
+      { role: 'quit', label: `退出 ${APP_TITLE}` }
+    ]
+  }
+}
+
+export function applicationMenuTemplate(
   send: (action: MenuAction) => void,
-  examples: ExampleMenuEntry[] = []
-): Menu {
-  const template: MenuItemConstructorOptions[] = [
+  examples: ExampleMenuEntry[] = [],
+  platform: NodeJS.Platform = process.platform
+): MenuItemConstructorOptions[] {
+  const mac = isMacPlatform(platform)
+  const template: MenuItemConstructorOptions[] = []
+
+  if (mac) {
+    template.push(macAppMenu())
+  }
+
+  template.push(
     {
       label: '文件',
       submenu: [
         { label: ACTION_LABEL.new, accelerator: 'CommandOrControl+N', click: () => send('new') },
         { label: ACTION_LABEL.open, accelerator: 'CommandOrControl+O', click: () => send('open') },
+        ...(mac
+          ? ([
+              {
+                label: '打开最近的文件',
+                role: 'recentDocuments',
+                submenu: [{ label: '清除记录', role: 'clearRecentDocuments' }]
+              }
+            ] satisfies MenuItemConstructorOptions[])
+          : []),
         { label: ACTION_LABEL.openExample, submenu: exampleSubmenu(send, examples) },
         {
           label: ACTION_LABEL.importJson,
@@ -40,7 +85,7 @@ export function createApplicationMenu(
           click: () => send('saveAs')
         },
         { type: 'separator' },
-        { role: process.platform === 'darwin' ? 'close' : 'quit', label: process.platform === 'darwin' ? '关闭' : '退出' }
+        { role: mac ? 'close' : 'quit', label: mac ? '关闭' : '退出' }
       ]
     },
     {
@@ -49,12 +94,12 @@ export function createApplicationMenu(
         { label: ACTION_LABEL.undo, accelerator: 'CommandOrControl+Z', click: () => send('undo') },
         {
           label: ACTION_LABEL.redo,
-          accelerator: 'CommandOrControl+Y',
+          accelerator: mac ? 'CommandOrControl+Shift+Z' : 'CommandOrControl+Y',
           click: () => send('redo')
         },
         {
           label: ACTION_LABEL.redo,
-          accelerator: 'CommandOrControl+Shift+Z',
+          accelerator: mac ? 'CommandOrControl+Y' : 'CommandOrControl+Shift+Z',
           visible: false,
           acceleratorWorksWhenHidden: true,
           click: () => send('redo')
@@ -63,12 +108,24 @@ export function createApplicationMenu(
         { role: 'cut', label: '剪切' },
         { label: ACTION_LABEL.copy, accelerator: 'CommandOrControl+C', click: () => send('copy') },
         { label: ACTION_LABEL.paste, accelerator: 'CommandOrControl+V', click: () => send('paste') },
+        { role: 'selectAll', label: '全选' },
         {
           label: ACTION_LABEL.duplicate,
           accelerator: 'CommandOrControl+D',
           click: () => send('duplicate')
         },
-        { label: ACTION_LABEL.delete, accelerator: 'Delete', click: () => send('delete') }
+        { label: ACTION_LABEL.delete, accelerator: 'Delete', click: () => send('delete') },
+        ...(mac
+          ? ([
+              {
+                label: ACTION_LABEL.delete,
+                accelerator: 'Backspace',
+                visible: false,
+                acceleratorWorksWhenHidden: true,
+                click: () => send('delete')
+              }
+            ] satisfies MenuItemConstructorOptions[])
+          : [])
       ]
     },
     {
@@ -86,26 +143,52 @@ export function createApplicationMenu(
         { role: 'zoomOut', label: '缩小' },
         { type: 'separator' },
         { label: ACTION_LABEL.fitView, click: () => send('fitView') },
-        { label: ACTION_LABEL.autoLayout, click: () => send('autoLayout') }
-      ]
-    },
-    {
-      label: '帮助',
-      submenu: [
-        {
-          label: '关于 Orchestrator Desktop',
-          click: () => {
-            void dialog.showMessageBox({
-              type: 'info',
-              title: '关于',
-              message: 'Orchestrator Desktop',
-              detail: `版本 ${app.getVersion()}`
-            })
-          }
-        }
+        { label: ACTION_LABEL.autoLayout, click: () => send('autoLayout') },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: '进入全屏幕' }
       ]
     }
-  ]
+  )
 
-  return Menu.buildFromTemplate(template)
+  if (mac) {
+    template.push({
+      label: '窗口',
+      role: 'window',
+      submenu: [
+        { role: 'minimize', label: '最小化' },
+        { role: 'zoom', label: '缩放' },
+        { type: 'separator' },
+        { role: 'front', label: '全部置于顶层' }
+      ]
+    })
+  }
+
+  template.push({
+    label: '帮助',
+    submenu: [
+      ...(!mac
+        ? ([
+            {
+              label: `关于 ${APP_TITLE}`,
+              click: () => showAbout()
+            }
+          ] satisfies MenuItemConstructorOptions[])
+        : []),
+      {
+        label: '项目主页',
+        click: () => {
+          void shell.openExternal('https://github.com/Xpropel/orchestrator-desktop')
+        }
+      }
+    ]
+  })
+
+  return template
+}
+
+export function createApplicationMenu(
+  send: (action: MenuAction) => void,
+  examples: ExampleMenuEntry[] = []
+): Menu {
+  return Menu.buildFromTemplate(applicationMenuTemplate(send, examples))
 }

@@ -36,8 +36,12 @@ export interface Api {
   setDirty(dirty: boolean): void
   /** 同步当前流程标题到窗口标题栏。 */
   setDocumentTitle(title: string): void
+  /** 同步当前文件路径（macOS 代理图标 / 文档脏点）。 */
+  setFilePath(filePath: string | null): void
   reportSaveResult(result: SaveResult): void
   onMenuAction(cb: (action: MenuAction) => void): () => void
+  /** Finder / Dock 打开的 .json；浏览器模式为空操作。 */
+  onOpenPath(cb: (filePath: string) => void): () => void
   confirmUnsaved(message?: string): Promise<UnsavedChoice>
   getRecentFiles(): Promise<string[]>
   writeRecovery(record: RecoveryRecord): Promise<void>

@@ -4,8 +4,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const zlib = require('node:zlib')
 
-const SIZE = 256
-const RADIUS = 48
+const SIZE = 1024
+const RADIUS = 192
 
 function crc32(buf) {
   let crc = 0xffffffff

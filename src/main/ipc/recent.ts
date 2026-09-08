@@ -46,6 +46,11 @@ export function getRecentFiles(): string[] {
 export function addRecentFile(filePath: string): void {
   allowPath(filePath)
   try {
+    app.addRecentDocument(filePath)
+  } catch {
+    // Windows Jump List / macOS 最近文件；失败不影响应用内列表。
+  }
+  try {
     const normalized = normalizePath(filePath)
     const next = [filePath, ...getRecentFiles().filter((item) => normalizePath(item) !== normalized)].slice(
       0,

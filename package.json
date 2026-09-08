@@ -1,6 +1,6 @@
 {
   "name": "orchestrator-desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Independent Electron desktop workflow orchestrator",
   "main": "./out/main/index.js",
@@ -26,7 +26,10 @@
     "smoke": "electron-vite build && node scripts/run-smoke.cjs",
     "smoke:examples": "electron-vite build && node scripts/run-smoke.cjs --examples",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder"
+    "pack:mac": "npm run build && electron-builder --mac --arm64 --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac --arm64",
+    "dist:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.8",

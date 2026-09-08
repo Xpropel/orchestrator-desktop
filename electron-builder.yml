@@ -22,8 +22,25 @@ nsis:
 portable:
   artifactName: ${productName}-${version}-portable.${ext}
 mac:
+  category: public.app-category.developer-tools
+  darkModeSupport: true
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  notarize: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Apple Silicon only. Intel Macs are not a release target.
   target:
-    - dmg
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+dmg:
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  title: ${productName} ${version}
 linux:
   target:
     - AppImage

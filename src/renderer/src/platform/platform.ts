@@ -121,8 +121,10 @@ const browserApi: Api = {
     browserDocTitle = title
     syncBrowserTitle()
   },
+  setFilePath: (_filePath) => undefined,
   reportSaveResult: (_result: SaveResult) => undefined,
   onMenuAction: (_cb: (action: MenuAction) => void) => () => undefined,
+  onOpenPath: (_cb: (filePath: string) => void) => () => undefined,
   confirmUnsaved: (message) => unsavedConfirm(message),
   getRecentFiles: async () => [],
   writeRecovery: async (record) => {
@@ -136,7 +138,9 @@ const browserApi: Api = {
   clearRecovery: async () => {
     window.localStorage.removeItem(RECOVERY_STORAGE_KEY)
   },
-  platform: 'win32'
+  get platform() {
+    return guessBrowserPlatform()
+  }
 }
 
 export function isElectron(): boolean {
@@ -155,8 +159,10 @@ export const fileApi: Api = {
   readFlow: (filePath) => nativeApi().readFlow(filePath),
   setDirty: (dirty) => nativeApi().setDirty(dirty),
   setDocumentTitle: (title) => nativeApi().setDocumentTitle(title),
+  setFilePath: (filePath) => nativeApi().setFilePath(filePath),
   reportSaveResult: (result) => nativeApi().reportSaveResult(result),
   onMenuAction: (cb) => nativeApi().onMenuAction(cb),
+  onOpenPath: (cb) => nativeApi().onOpenPath(cb),
   confirmUnsaved: (message) => nativeApi().confirmUnsaved(message),
   getRecentFiles: () => nativeApi().getRecentFiles(),
   writeRecovery: (record) => nativeApi().writeRecovery(record),

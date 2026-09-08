@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { runMenuAction } from '@/app/menu-actions'
+import { openFlow } from '@/features/files/file-actions'
 import { fileApi, isElectron } from '@/platform/platform'
 import { useFlowStore } from '@/state/flow-store'
 import { isTextInputTarget } from '@/ui/is-text-input-target'
@@ -38,6 +39,7 @@ export function useAppShortcuts(): void {
     const initial = useFlowStore.getState()
     fileApi.setDirty(initial.dirty)
     fileApi.setDocumentTitle(initial.title)
+    fileApi.setFilePath(initial.filePath)
     return useFlowStore.subscribe((state, prev) => {
       if (state.dirty !== prev.dirty) {
         fileApi.setDirty(state.dirty)
@@ -45,6 +47,15 @@ export function useAppShortcuts(): void {
       if (state.title !== prev.title) {
         fileApi.setDocumentTitle(state.title)
       }
+      if (state.filePath !== prev.filePath) {
+        fileApi.setFilePath(state.filePath)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    return fileApi.onOpenPath((filePath) => {
+      void openFlow(filePath)
     })
   }, [])
 

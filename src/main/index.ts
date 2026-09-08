@@ -10,12 +10,21 @@ import { attachNavigationGuard, attachWindowOpenHandler } from './security/navig
 import { isSmoke, remoteDebugPort } from './window/smoke-env'
 import { attachSmokeHooks } from './window/smoke'
 import { createWindow, sendMenuAction } from './window/create'
+import { deliverOpenPath, flowPathsFromArgv } from './window/open-file'
+import { APP_TITLE, appState } from './window/app-state'
+
+app.setName(APP_TITLE)
 
 const debugPort = remoteDebugPort()
 if (debugPort) {
   app.commandLine.appendSwitch('remote-debugging-port', debugPort)
   app.commandLine.appendSwitch('remote-allow-origins', '*')
 }
+
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  deliverOpenPath(filePath)
+})
 
 app.on('web-contents-created', (_event, contents) => {
   attachNavigationGuard(contents)
@@ -31,6 +40,9 @@ app.whenReady().then(async () => {
   if (isSmoke()) {
     await clearRecovery()
   }
+  for (const filePath of flowPathsFromArgv(process.argv, app.isPackaged)) {
+    deliverOpenPath(filePath)
+  }
   const win = createWindow()
   if (isSmoke()) {
     attachSmokeHooks(win)
@@ -44,6 +56,10 @@ app.whenReady().then(async () => {
       }
     }
   })
+})
+
+app.on('before-quit', () => {
+  appState.quitRequested = true
 })
 
 app.on('window-all-closed', () => {

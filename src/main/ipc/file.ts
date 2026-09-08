@@ -1,4 +1,4 @@
-import { basename } from 'node:path'
+import { basename, join } from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, dialog, type IpcMain } from 'electron'
 import { allowPath, isPathAllowed, PATH_NOT_ALLOWED } from '../security/allowed-paths'
@@ -18,6 +18,7 @@ export function registerFileIpc(ipc: IpcMain): void {
     const win = BrowserWindow.fromWebContents(event.sender)
     const options: Electron.OpenDialogOptions = {
       title: typeof title === 'string' && title.length > 0 ? title : '打开流程',
+      defaultPath: app.getPath('documents'),
       properties: ['openFile'],
       filters: FLOW_FILTERS
     }
@@ -81,7 +82,7 @@ export function registerFileIpc(ipc: IpcMain): void {
     const rawName = typeof defaultName === 'string' ? defaultName : 'untitled.flow.json'
     const options: Electron.SaveDialogOptions = {
       title: '流程另存为',
-      defaultPath: basename(rawName) || 'untitled.flow.json',
+      defaultPath: join(app.getPath('documents'), basename(rawName) || 'untitled.flow.json'),
       filters: FLOW_FILTERS
     }
     const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)

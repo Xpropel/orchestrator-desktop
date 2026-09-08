@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const userData = join(tmpdir(), `orch-audit-main-${process.pid}`)
@@ -10,7 +11,8 @@ vi.mock('electron', () => ({
     getPath: () => userData,
     isPackaged: false,
     getVersion: () => '0.0.0',
-    getAppPath: () => userData
+    getAppPath: () => userData,
+    addRecentDocument: () => undefined
   },
   BrowserWindow: {
     fromWebContents: () => null,
@@ -50,7 +52,9 @@ beforeEach(() => {
   resetAllowedPaths()
   appState.dirty = false
   appState.documentTitle = ''
+  appState.filePath = ''
   appState.ignoreCloseGuard = false
+  appState.quitRequested = false
   failPendingSave('failed')
 })
 
@@ -71,16 +75,17 @@ describe('window title', () => {
 })
 
 describe('file navigation guard', () => {
-  const rendererIndex = join('C:', 'app', 'out', 'renderer', 'index.html')
+  const rendererIndex = join(userData, 'out', 'renderer', 'index.html')
 
   it('rejects an arbitrary file:// index.html that would keep preload/IPC', () => {
     expect(isAllowedFileNavigation('file:///C:/evil/index.html', rendererIndex)).toBe(false)
-    expect(isAllowedFileNavigation('file:///C:/evil/renderer/index.html', rendererIndex)).toBe(false)
+    expect(
+      isAllowedFileNavigation(pathToFileURL(join(userData, 'evil', 'renderer', 'index.html')).href, rendererIndex)
+    ).toBe(false)
   })
 
   it('allows only the app renderer index after path normalization', () => {
-    const href = `file:///${rendererIndex.replace(/\\/g, '/')}`
-    expect(isAllowedFileNavigation(href, rendererIndex)).toBe(true)
+    expect(isAllowedFileNavigation(pathToFileURL(rendererIndex).href, rendererIndex)).toBe(true)
   })
 
   it('blocks javascript and file open-external, allows https', () => {
@@ -221,5 +226,12 @@ describe('packaging', () => {
     expect(yml).toContain('examples/**/*')
     expect(yml).toContain('!examples/private/**')
     expect(yml).toContain('!private/**')
+  })
+
+  it('packages macOS for Apple Silicon only', () => {
+    const yml = readFileSync(join(__dirname, '../../../../electron-builder.yml'), 'utf8')
+    expect(yml).toContain('arm64')
+    expect(yml).not.toContain('x64')
+    expect(yml).not.toContain('universal')
   })
 })
