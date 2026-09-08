@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { loadLibrary } from '@/core/library'
 import type { ExtensionRule } from '@/core/library'
+import { hasOperator } from '@/core/registry'
 import { issue } from '../issue'
 import type { FlowEdge, FlowNode } from '@/core/types'
 import { applyExtensionRules, validateFlow } from '../index'
@@ -257,6 +258,10 @@ describe('audit validate: branches and extensions', () => {
   })
 
   it('does not emit DS2API_SESSION_REQUIRED alongside MISSING_REQUIRED', () => {
+    // 该算子在私有子模块里；公开克隆没有它时跳过，避免把本机扩展当成公开契约。
+    if (!hasOperator('ds2api.chat.completion')) {
+      return
+    }
     const chat = node('c', 'ds2api.chat.completion', 'Chat_1', { prompt: 'hi' })
     const found = issues([start(), chat], [edge('s', 'c')])
     expect(found.filter((item) => item.code === 'DS2API_SESSION_REQUIRED')).toHaveLength(0)

@@ -1,3 +1,5 @@
+import { isMacPlatform, runtimePlatform } from './platform'
+
 export const ACTION_LABEL = {
   new: '新建',
   open: '打开…',
@@ -21,15 +23,42 @@ export const ACTION_LABEL = {
   importJson: '导入 JSON'
 } as const
 
-export const ACTION_SHORTCUT = {
-  undo: 'Ctrl+Z',
-  redo: 'Ctrl+Y',
-  copy: 'Ctrl+C',
-  paste: 'Ctrl+V',
-  duplicate: 'Ctrl+D',
-  delete: 'Delete'
-} as const
+export type ShortcutAction = 'undo' | 'redo' | 'copy' | 'paste' | 'duplicate' | 'delete'
 
-export function labeledShortcut(action: keyof typeof ACTION_SHORTCUT): string {
-  return `${ACTION_LABEL[action]} (${ACTION_SHORTCUT[action]})`
+export function actionShortcuts(platform: NodeJS.Platform = runtimePlatform()): Record<ShortcutAction, string> {
+  if (isMacPlatform(platform)) {
+    return {
+      undo: '⌘Z',
+      redo: '⌘⇧Z',
+      copy: '⌘C',
+      paste: '⌘V',
+      duplicate: '⌘D',
+      delete: '⌫'
+    }
+  }
+  return {
+    undo: 'Ctrl+Z',
+    redo: 'Ctrl+Y',
+    copy: 'Ctrl+C',
+    paste: 'Ctrl+V',
+    duplicate: 'Ctrl+D',
+    delete: 'Delete'
+  }
+}
+
+/** 当前运行平台的快捷键文案（工具栏 title / 文档）。 */
+export const ACTION_SHORTCUT = actionShortcuts()
+
+export function actionShortcut(
+  action: ShortcutAction,
+  platform: NodeJS.Platform = runtimePlatform()
+): string {
+  return actionShortcuts(platform)[action]
+}
+
+export function labeledShortcut(
+  action: ShortcutAction,
+  platform: NodeJS.Platform = runtimePlatform()
+): string {
+  return `${ACTION_LABEL[action]} (${actionShortcut(action, platform)})`
 }

@@ -44,9 +44,11 @@ import {
   type CanvasNode
 } from '@/features/canvas/flow-types'
 import { CATEGORY_DRAG_MIME, OPERATOR_DRAG_MIME } from '@/shared/mime'
+import { fileApi } from '@/platform/platform'
 import { useThemeStore } from '@/state/theme-store'
 import { useFlowStore } from '@/state/flow-store'
 import { useUiStore } from '@/state/ui-store'
+import { canvasPointerBehavior } from './pointer-behavior'
 import { CanvasToolbar } from './canvas-toolbar'
 import { ContextMenu, type ContextMenuState } from './context-menu/context-menu'
 
@@ -377,7 +379,7 @@ function FlowCanvas(): JSX.Element {
         connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 1.6, strokeDasharray: '6 4' }}
         isValidConnection={isValidConnection}
         selectionOnDrag
-        panOnDrag={[1, 2]}
+        {...canvasPointerBehavior(fileApi.platform)}
         onNodeClick={onNodeClick}
         onNodeMouseDown={onNodeMouseDown}
         onPaneClick={onPaneClick}

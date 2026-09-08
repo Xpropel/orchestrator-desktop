@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import type { SaveResult } from '../../preload/index.d'
 import { clearRecovery } from '../ipc/recovery-store'
 import { appState } from './app-state'
@@ -73,6 +73,7 @@ export function attachCloseGuard(win: BrowserWindow): void {
       try {
         const choice = await promptUnsaved(win)
         if (choice === 'cancel' || win.isDestroyed()) {
+          appState.quitRequested = false
           return
         }
         if (choice === 'save') {
@@ -100,6 +101,9 @@ export function attachCloseGuard(win: BrowserWindow): void {
         appState.ignoreCloseGuard = true
         if (!win.isDestroyed()) {
           win.close()
+        }
+        if (appState.quitRequested) {
+          app.quit()
         }
       } finally {
         guarding = false

@@ -4,20 +4,22 @@
 
 ## Overview
 
-Orchestrator Desktop is a standalone Electron app for designing agent and workflow graphs. It only reads and writes JSON files: there is no backend, no hosted service, and it does not run the graph or store LLM API keys. The canvas layout follows RAGFlow’s agent editor — a floating two-level component palette, a React Flow graph with a transparent compact toolbar, and a floating property inspector. Operators are registered in a data-driven public library; extra categories can be dropped into a gitignored private folder and are picked up at build time. Windows x64 binaries are published on GitHub Releases; macOS and Linux can be built from source.
+Orchestrator Desktop is a standalone Electron app for designing agent and workflow graphs. It only reads and writes JSON files: there is no backend, no hosted service, and it does not run the graph or store LLM API keys. The canvas layout follows RAGFlow’s agent editor — a floating two-level component palette, a React Flow graph with a transparent compact toolbar, and a floating property inspector. Operators are registered in a data-driven public library; extra categories can be dropped into a gitignored private folder and are picked up at build time. GitHub Releases publish **Windows x64** and **macOS Apple Silicon (arm64)** builds. Intel Macs are not a release target.
 
 ![Orchestrator Desktop](docs/images/hero.png)
 
 ## 下载 / Download
 
-预编译包见 [GitHub Releases](https://github.com/Xpropel/orchestrator-desktop/releases/latest)（当前版本 `v0.1.2`）。目前只提供 **Windows x64**：
+预编译包见 [GitHub Releases](https://github.com/Xpropel/orchestrator-desktop/releases/latest)（当前版本 `v0.1.3`）：
 
 | 文件 | 说明 |
 | --- | --- |
-| `Orchestrator.Desktop-0.1.2-portable.exe` | 免安装，双击运行 |
-| `Orchestrator.Desktop-0.1.2-setup.exe` | NSIS 安装包，可选安装目录 |
+| `Orchestrator Desktop-0.1.3-mac-arm64.dmg` | macOS Apple Silicon（M 系列），拖到「应用程序」 |
+| `Orchestrator Desktop-0.1.3-mac-arm64.zip` | 同上，解压即用 |
+| [`Orchestrator.Desktop-0.1.1-setup.exe`](https://github.com/Xpropel/orchestrator-desktop/releases/tag/v0.1.1) | Windows x64，NSIS 安装包（当前仍为 v0.1.1） |
+| [`Orchestrator.Desktop-0.1.1-portable.exe`](https://github.com/Xpropel/orchestrator-desktop/releases/tag/v0.1.1) | Windows x64，免安装（当前仍为 v0.1.1） |
 
-可执行文件未代码签名，Windows SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。macOS（`dmg`）与 Linux（`AppImage`）可从源码用 `electron-builder.yml` 中的目标打包，尚未测试。
+Windows 可执行文件未代码签名，SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。macOS 包仅面向 **Apple Silicon**，未做 Intel 构建；未公证时首次打开请在 Finder 里右键 → 打开。Linux（`AppImage`）仍可从源码打包，尚未作为发布目标。
 
 ## 界面预览
 
@@ -29,7 +31,7 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 
 - **悬浮组件栏**：玻璃质感卡片，默认停在画布左上；可拖动、右缘拉宽、底边拉高。窄于阈值时吸附成仅图标的窄栏，拉回即恢复文字。点类别在卡片旁弹出工具飞出面板（右侧放不下自动翻到左侧）；搜索时跨类别平铺；把整个类别拖到画布会弹出算子选择器。关闭后收成左上角圆钮。
 - **悬浮属性面板**：单击节点打开（拖动 / 框选 / 右键只改选中，不弹面板）。可拖动、左缘拉宽、底边拉高、折叠；位置与尺寸记在 `localStorage`。无节点时收成右上角「流程设置」。两张卡片共用 `ui/floating-card` 的拖拽 / 夹边 / 记忆逻辑。
-- **紧凑工具栏**：36px、背景透明，悬浮在画布顶部，按钮组之间的空白可直接拖动画布；原生菜单栏默认隐藏（按 Alt 临时显示，快捷键不受影响）。
+- **紧凑工具栏**：36px、背景透明，悬浮在画布顶部，按钮组之间的空白可直接拖动画布。Windows 下原生菜单栏默认隐藏（按 Alt 临时显示）；macOS 使用系统菜单栏，窗口为 `hiddenInset` 红绿灯，红灯在未保存时显示脏点。
 - **节点可拉伸**：任务卡、分支、开始、结束、跳出、容器、便签选中后都有四角 / 四边把手；尺寸随文档保存，可撤销。
 - **数据驱动算子库**（`src/renderer/src/core/library/`）：注册表共 37 个算子；侧栏隐藏 `loop-start`（随循环容器自动创建），故面板可见 36 个。
 
@@ -52,10 +54,10 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 - **输出变量**：节点卡片底部列出该节点暴露给下游的变量名（含 `start.inputs` / `dataset.fields` 声明的字段）；属性面板给出 `{{节点名.变量}}` 形式的引用。它与出边数量无关。
 - **模型徽标**：LLM 相关节点显示 DeepSeek / 通义千问图标 + 模型名（预设 `deepseek-chat`、`deepseek-reasoner`、`qwen-plus`、`qwen-max`，也可自定义字符串）。编排器不配置、不保存 API Key。
 - **多入口**：可添加多个 `start`；空画布第一个 id/name 为 `start`，其后为 `start:<id>`。最后一个 start 不可删除。
-- **撤销 / 重做**：Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z）。
+- **撤销 / 重做**：Windows 为 Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z）；Mac 为 ⌘Z / ⌘⇧Z。
 - **自动保存**：仅 Electron；已命名且脏时按间隔静默写回（30s / 1m / 2m / 5m，默认 1 分钟）。未命名文件不自动保存。
 - **崩溃恢复**：Electron 与浏览器模式都可用。变脏 3 秒后写第一份快照，之后每 20 秒续写；保存 / 新建 / 打开后清除；下次启动若发现快照会询问是否恢复（两端同一段 `window.confirm` 文案）。Electron 写入 `userData/recovery.flow.json`，浏览器写入 `localStorage` 键 `orchestrator.recovery`。
-- **导入 JSON**：工具栏「导入 JSON」（Ctrl+I）、或把 `.json` 拖到窗口。识别本格式、RAGFlow DSL（`graph` + `components`、无 `version`）、RAGFlow 外层 `{title, dsl}`、以及裸 `{nodes, edges}`。非本格式按未命名载入，不会覆盖原文件。
+- **导入 JSON**：工具栏「导入 JSON」（Ctrl/⌘+I）、或把 `.json` 拖到窗口。识别本格式、RAGFlow DSL（`graph` + `components`、无 `version`）、RAGFlow 外层 `{title, dsl}`、以及裸 `{nodes, edges}`。非本格式按未命名载入，不会覆盖原文件。
 - **导出 JSON**：工具栏下载当前流程（`.flow.json`）。保存 / 另存为写入磁盘。
 - **示例**：工具栏「示例」载入打包内的 `examples/*.flow.json`。
 - **主题**：深色 / 浅色，强调色 blue / violet / emerald / amber，记在 `localStorage`。
@@ -120,14 +122,16 @@ export default {
 
 ## 快捷键
 
-Electron 由原生菜单的加速键分发（菜单栏默认隐藏，按 Alt 显示）；浏览器模式由 `use-app-shortcuts.ts` 映射同一组动作。
+Electron 由原生菜单的加速键分发（Windows 菜单栏默认隐藏，按 Alt 显示；macOS 始终在屏幕顶栏）；浏览器模式由 `use-app-shortcuts.ts` 映射同一组动作。下表 Windows 用 Ctrl，Mac 用 ⌘。
 
-| 动作 | 快捷键 |
-| --- | --- |
-| 新建 / 打开 / 导入 JSON / 保存 / 另存为 | Ctrl+N / Ctrl+O / Ctrl+I / Ctrl+S / Ctrl+Shift+S |
-| 撤销 / 重做 | Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z） |
-| 复制 / 粘贴 / 克隆 | Ctrl+C / Ctrl+V / Ctrl+D |
-| 删除 | Delete（浏览器模式另支持 Backspace） |
+| 动作 | Windows | macOS |
+| --- | --- | --- |
+| 新建 / 打开 / 导入 JSON / 保存 / 另存为 | Ctrl+N / O / I / S / Shift+S | ⌘N / O / I / S / ⇧S |
+| 撤销 / 重做 | Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z） | ⌘Z / ⌘⇧Z |
+| 复制 / 粘贴 / 克隆 | Ctrl+C / V / D | ⌘C / V / D |
+| 删除 | Delete（浏览器模式另支持 Backspace） | ⌫ |
+| 平移画布 | 中键 / 右键拖动 | 触控板双指滑动；或按住空格再拖动 |
+| 缩放画布 | 滚轮 | 捏合；或 ⌘+双指滑动 |
 
 焦点在文本框时，编辑类动作不接管，留给原生撤销 / 输入。
 
@@ -156,6 +160,8 @@ npm test
 npm run lint
 npm run build
 npm run dist         # 按当前平台打安装包（国内可设 ELECTRON_BUILDER_BINARIES_MIRROR）
+npm run dist:mac     # 仅 Apple Silicon（arm64）dmg + zip
+npm run dist:win     # Windows setup + portable
 ```
 
 浏览器模式没有 `window.api`：用本机文件选择器打开、用下载保存；最近文件与自动保存不可用。崩溃恢复走 `localStorage`（键 `orchestrator.recovery`，恢复提示与 Electron 相同）。
@@ -183,7 +189,7 @@ npm run dist         # 按当前平台打安装包（国内可设 ELECTRON_BUILD
 ```
 src/
   main/                 Electron 主进程（index.ts 只装配）
-    window/             窗口创建、标题、关窗守卫、未保存对话框、app-state、smoke / smoke-env
+    window/             窗口创建、标题、关窗守卫、未保存对话框、open-file、app-state、smoke / smoke-env
     ipc/                file / recovery / recovery-store / app / recent / examples
     menu/               原生菜单（文案与渲染进程共享 src/shared/action-labels.ts）
     security/           CSP、路径白名单、导航拦截、normalizePath
@@ -198,9 +204,10 @@ src/
     ui/                 无业务基础控件
     shared/             MIME 常量
     test/setup.ts       vitest 加载算子库
-scripts/                csp-plugin.ts · generate-icon.cjs · run-smoke.cjs
+scripts/                csp-plugin.ts · generate-icon.cjs · run-smoke.cjs · private-library-resolve.ts
 examples/               内置示例与 index.json
-build/icon.png          应用图标（electron-builder）
+build/icon.png          应用图标（electron-builder，1024px）
+build/entitlements.mac.plist  macOS 打包权限
 docs/                   规格、重构计划、README 截图（`docs/private/` gitignore）
 ```
 

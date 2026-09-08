@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { EDITABLE_FIELD_JS } from '../../shared/text-input'
 import type { MenuAction } from '../../preload/index.d'
 import { nativeEditCommand } from '../menu/native-edit'
 import { attachNavigationGuard, attachWindowOpenHandler } from '../security/navigation'
 import { APP_TITLE } from './app-state'
 import { attachCloseGuard } from './close-guard'
+import { attachOpenPathFlush } from './open-file'
 
 function resolvePreloadPath(): string {
   const preloadJs = join(__dirname, '../preload/index.js')
@@ -72,6 +73,20 @@ export function sendMenuAction(action: MenuAction): void {
     })
 }
 
+function windowChrome(): BrowserWindowConstructorOptions {
+  if (process.platform === 'darwin') {
+    return {
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: { x: 16, y: 10 },
+      acceptFirstMouse: true
+    }
+  }
+  return {
+    // Windows：菜单栏默认隐藏（Alt 临时显示）；加速键仍走应用菜单。
+    autoHideMenuBar: true
+  }
+}
+
 export function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1440,
@@ -79,10 +94,9 @@ export function createWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 680,
     show: false,
-    // 菜单栏默认隐藏（Alt 临时显示）；应用菜单仍然挂着，Ctrl+S / Ctrl+Z 等加速键靠它触发。
-    autoHideMenuBar: true,
     backgroundColor: '#0d1117',
     title: APP_TITLE,
+    ...windowChrome(),
     webPreferences: {
       preload: resolvePreloadPath(),
       sandbox: true,
@@ -99,6 +113,7 @@ export function createWindow(): BrowserWindow {
   attachWindowOpenHandler(mainWindow.webContents)
   attachNavigationGuard(mainWindow.webContents)
   attachCloseGuard(mainWindow)
+  attachOpenPathFlush(mainWindow)
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)

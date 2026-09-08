@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'electron-vite'
 import { cspPlugin } from './scripts/csp-plugin'
+import { privateLibraryResolve } from './scripts/private-library-resolve'
 
 export default defineConfig({
   main: {},
@@ -17,6 +18,7 @@ export default defineConfig({
       }
     },
     plugins: [
+      privateLibraryResolve(),
       react(),
       cspPlugin(() => Boolean(process.env.ELECTRON_RENDERER_URL))
     ]

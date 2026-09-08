@@ -11,7 +11,7 @@ import {
   useSettingsStore,
   type AutosaveIntervalSec
 } from '@/state/settings-store'
-import { isElectron } from '@/platform/platform'
+import { fileApi, isElectron } from '@/platform/platform'
 import { cn } from '@/ui/cn'
 import { Input } from '@/ui/input'
 import { ToolButton } from '@/ui/tool-button'
@@ -71,9 +71,12 @@ export function Toolbar(): JSX.Element {
     setTitleDraft(title)
   }, [filePath, revision, title])
 
+  const isMac = fileApi.platform === 'darwin'
+
   return (
     // 悬浮在画布顶部、背景透明；三组之间的空白不拦截指针，画布仍可从那里拖动。
     <header className="orch-top-toolbar pointer-events-none absolute inset-x-0 top-0 z-30 flex h-toolbar items-center justify-between gap-2 px-2">
+      {isMac ? <div className="orch-traffic-light-space pointer-events-auto" aria-hidden /> : null}
       <div className="pointer-events-auto flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
         <ToolButton onClick={() => void newFlow()}>
           <FilePlus className="h-3.5 w-3.5" />
@@ -105,11 +108,11 @@ export function Toolbar(): JSX.Element {
         </ToolButton>
       </div>
 
-      <div className="pointer-events-auto flex min-w-0 flex-1 items-center justify-center gap-2 text-[11px] text-secondary">
+      <div className="pointer-events-auto orch-toolbar-drag flex min-w-0 flex-1 items-center justify-center gap-2 text-[11px] text-secondary">
         {editingTitle ? (
           <Input
             autoFocus
-            className="h-6 max-w-[240px] text-center text-xs"
+            className="orch-no-drag h-6 max-w-[240px] text-center text-xs"
             value={titleDraft}
             onChange={(event) => setTitleDraft(event.target.value)}
             onBlur={commitTitle}
@@ -129,7 +132,7 @@ export function Toolbar(): JSX.Element {
         ) : (
           <button
             type="button"
-            className="max-w-[280px] truncate text-[13px] font-medium text-primary hover:text-accent"
+            className="orch-no-drag max-w-[280px] truncate text-[13px] font-medium text-primary hover:text-accent"
             title={filePath ? `${filePath}（点击编辑标题）` : '点击编辑标题'}
             onClick={() => {
               setTitleDraft(title)

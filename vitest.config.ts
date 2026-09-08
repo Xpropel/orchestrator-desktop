@@ -1,7 +1,9 @@
 import path from 'node:path'
 import { defineConfig } from 'vitest/config'
+import { privateLibraryResolve } from './scripts/private-library-resolve'
 
 export default defineConfig({
+  plugins: [privateLibraryResolve()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src/renderer/src'),

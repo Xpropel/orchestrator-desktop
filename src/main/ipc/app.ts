@@ -20,6 +20,14 @@ export function registerAppIpc(ipc: IpcMain): void {
     }
   })
 
+  ipc.on('app:setFilePath', (event, filePath: unknown) => {
+    appState.filePath = typeof filePath === 'string' ? filePath : ''
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) {
+      applyTitle(win)
+    }
+  })
+
   ipc.on('file:saveResult', (event, result: unknown) => {
     if (!isSaveResult(result)) {
       return

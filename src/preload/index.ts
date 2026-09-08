@@ -13,6 +13,9 @@ const api: Api = {
   setDocumentTitle: (title) => {
     ipcRenderer.send('app:setDocumentTitle', title)
   },
+  setFilePath: (filePath) => {
+    ipcRenderer.send('app:setFilePath', filePath)
+  },
   reportSaveResult: (result: SaveResult) => {
     ipcRenderer.send('file:saveResult', result)
   },
@@ -23,6 +26,17 @@ const api: Api = {
     ipcRenderer.on('menu:action', listener)
     return () => {
       ipcRenderer.removeListener('menu:action', listener)
+    }
+  },
+  onOpenPath: (cb) => {
+    const listener = (_event: IpcRendererEvent, filePath: string): void => {
+      if (typeof filePath === 'string' && filePath.length > 0) {
+        cb(filePath)
+      }
+    }
+    ipcRenderer.on('file:openFromOs', listener)
+    return () => {
+      ipcRenderer.removeListener('file:openFromOs', listener)
     }
   },
   confirmUnsaved: (message) =>
