@@ -26,7 +26,8 @@ export function createWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 680,
     show: false,
-    autoHideMenuBar: false,
+    // 菜单栏默认隐藏（Alt 临时显示）；应用菜单仍然挂着，Ctrl+S / Ctrl+Z 等加速键靠它触发。
+    autoHideMenuBar: true,
     backgroundColor: '#0d1117',
     title: APP_TITLE,
     webPreferences: {
