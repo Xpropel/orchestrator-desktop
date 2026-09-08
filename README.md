@@ -10,16 +10,14 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 
 ## 下载 / Download
 
-预编译包见 [GitHub Releases](https://github.com/Xpropel/orchestrator-desktop/releases/latest)（当前版本 `v0.1.3`）：
+预编译包见 [GitHub Releases](https://github.com/Xpropel/orchestrator-desktop/releases/latest)。仓库默认分支 `main` 与当前版本均为 **`v0.1.3`**。
 
 | 文件 | 说明 |
 | --- | --- |
 | `Orchestrator.Desktop-0.1.3-mac-arm64.dmg` | macOS Apple Silicon（M 系列），拖到「应用程序」 |
 | `Orchestrator.Desktop-0.1.3-mac-arm64.zip` | 同上，解压即用 |
-| [`Orchestrator.Desktop-0.1.1-setup.exe`](https://github.com/Xpropel/orchestrator-desktop/releases/tag/v0.1.1) | Windows x64，NSIS 安装包（当前仍为 v0.1.1） |
-| [`Orchestrator.Desktop-0.1.1-portable.exe`](https://github.com/Xpropel/orchestrator-desktop/releases/tag/v0.1.1) | Windows x64，免安装（当前仍为 v0.1.1） |
 
-Windows 可执行文件未代码签名，SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。macOS 包仅面向 **Apple Silicon**，未做 Intel 构建；未公证时首次打开请在 Finder 里右键 → 打开。Linux（`AppImage`）仍可从源码打包，尚未作为发布目标。
+macOS 包仅面向 **Apple Silicon**，未做 Intel 构建；未公证时首次打开请在 Finder 里右键 → 打开。Windows x64 与本版本同源，在 Windows 上执行 `npm run dist:win` 即可打出 `setup` / `portable`。Linux（`AppImage`）仍可从源码打包，尚未作为发布目标。
 
 ## 界面预览
 

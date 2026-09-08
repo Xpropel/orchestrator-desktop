@@ -230,8 +230,9 @@ describe('packaging', () => {
 
   it('packages macOS for Apple Silicon only', () => {
     const yml = readFileSync(join(__dirname, '../../../../electron-builder.yml'), 'utf8')
-    expect(yml).toContain('arm64')
-    expect(yml).not.toContain('x64')
-    expect(yml).not.toContain('universal')
+    const mac = yml.slice(yml.indexOf('\nmac:'), yml.indexOf('\nlinux:'))
+    expect(mac).toContain('arm64')
+    expect(mac).not.toContain('x64')
+    expect(mac).not.toContain('universal')
   })
 })
