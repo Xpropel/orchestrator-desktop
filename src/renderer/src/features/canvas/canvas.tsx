@@ -39,7 +39,7 @@ import {
 } from '@/core/graph'
 import { getOperator, getTargetHandles, hasOperator } from '@/core/registry'
 import { HANDLE_END, HANDLE_START, logicalHandleId } from '@/core/handles'
-import { mergeNodeMetrics, pickDropTargetNode } from '@/features/canvas/drop-target'
+import { isSourceOrAncestor, mergeNodeMetrics, pickDropTargetNode } from '@/features/canvas/drop-target'
 import {
   toCanvasEdges,
   toCanvasNode,
@@ -223,9 +223,13 @@ function FlowCanvas(): JSX.Element {
       const sourceHandle = logicalHandleId(connectionState.fromHandle?.id) ?? HANDLE_START
       const state = useFlowStore.getState()
       const measured = mergeNodeMetrics(state.nodes, (getNodes() as CanvasNode[]).map(toFlowNode))
+      // 起点自身和它所在的容器不算落点：从循环体内部拉到容器空白处，应当在容器内新建节点，而不是连到容器上。
+      const nearHandle = connectionState.toNode?.id
       const hit =
-        pickDropTargetNode(flowPos, measured) ??
-        (connectionState.toNode ? state.nodes.find((node) => node.id === connectionState.toNode?.id) : undefined)
+        pickDropTargetNode(flowPos, measured, from.id) ??
+        (nearHandle && !isSourceOrAncestor(state.nodes, from.id, nearHandle)
+          ? state.nodes.find((node) => node.id === nearHandle)
+          : undefined)
       if (hit) {
         const targetHandle = hasOperator(hit.data.label)
           ? (getTargetHandles(hit.data.label)[0]?.id ?? HANDLE_END)

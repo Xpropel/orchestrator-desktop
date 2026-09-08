@@ -37,13 +37,32 @@ export function mergeNodeMetrics(storeNodes: FlowNode[], measured: FlowNode[]): 
   })
 }
 
-/** 落点命中：排除便签；多层重叠取最深，同深度取更上层（数组更靠后）。 */
-export function pickDropTargetNode(point: XYPosition, nodes: FlowNode[]): FlowNode | null {
+/** 连线起点所在的容器链（含起点自身）：从容器内部拉线时，落在容器空白处不算“落到容器上”。 */
+function ancestorChain(sourceId: string, byId: Map<string, FlowNode>): Set<string> {
+  const chain = new Set<string>([sourceId])
+  let parentId = byId.get(sourceId)?.parentId
+  while (parentId && !chain.has(parentId)) {
+    chain.add(parentId)
+    parentId = byId.get(parentId)?.parentId
+  }
+  return chain
+}
+
+export function isSourceOrAncestor(nodes: FlowNode[], sourceId: string, candidateId: string): boolean {
+  return ancestorChain(sourceId, new Map(nodes.map((node) => [node.id, node]))).has(candidateId)
+}
+
+/**
+ * 落点命中：排除便签；多层重叠取最深，同深度取更上层（数组更靠后）。
+ * 传入 `sourceId` 时，起点自身及其所在的容器不参与命中——这些位置应视为空白，交给新建算子的选择器。
+ */
+export function pickDropTargetNode(point: XYPosition, nodes: FlowNode[], sourceId?: string): FlowNode | null {
   const byId = new Map(nodes.map((node) => [node.id, node]))
+  const excluded = sourceId ? ancestorChain(sourceId, byId) : new Set<string>()
   const hits: { node: FlowNode; index: number; depth: number }[] = []
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index]
-    if (!node || isNoteNode(node)) continue
+    if (!node || isNoteNode(node) || excluded.has(node.id)) continue
     if (!pointInBox(point, getNodeAbsoluteBox(node, nodes))) continue
     hits.push({ node, index, depth: parentDepth(node, byId) })
   }
