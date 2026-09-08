@@ -108,6 +108,32 @@ describe('graphToDocument', () => {
     expect(doc.graph.nodes.find((item) => item.id === 'sw')?.data.form).toEqual({ cases })
   })
 
+  it('writes cases[].to for an id-less If using parseCases case-${index} ids', () => {
+    const form = {
+      cases: [
+        { label: 'Yes', expression: 'ok' },
+        { label: 'No', expression: 'no' }
+      ]
+    }
+    const nodes = [
+      makeNode('begin', 'start', {}),
+      makeNode('iff', 'if', form, { type: 'branchNode' }),
+      makeNode('yes', 'agent', {}),
+      makeNode('no', 'agent', {})
+    ]
+    const edges = [
+      makeEdge('e0', 'begin', 'iff'),
+      makeEdge('e1', 'iff', 'yes', 'case-0'),
+      makeEdge('e2', 'iff', 'no', 'case-1')
+    ]
+    const doc = graphToDocument(nodes, edges, 'IfNoId')
+    const params = doc.components.iff?.obj.params as { cases: Array<{ id: string; to: string[] }> }
+    expect(params.cases[0]).toMatchObject({ id: 'case-0', to: ['yes'] })
+    expect(params.cases[1]).toMatchObject({ id: 'case-1', to: ['no'] })
+    expect(form.cases[0]).not.toHaveProperty('id')
+    expect(doc.graph.nodes.find((item) => item.id === 'iff')?.data.form).toEqual(form)
+  })
+
   it('maps classifier category handles to params.categories[].to', () => {
     const categories = [
       { id: 'cat1', name: 'Billing', description: 'pay' },
@@ -302,6 +328,108 @@ describe('documentToGraph / serialize / parse', () => {
     expect(again.nodes.find((item) => item.id === 'ds1')?.data.form).toEqual(form)
     expect(again.nodes.find((item) => item.id === 'ds1')?.type).toBe('taskNode')
     expect(parseDocument(serializeDocument(doc))).toEqual(doc)
+  })
+
+  it('round-trips parentId, width/height/style, and form value types', () => {
+    const nodes = [
+      makeNode('begin', 'start', { count: 3, flag: true, nested: { n: 1 } }, { type: 'startNode' }),
+      {
+        ...makeNode('box', 'foreach', { items: '{{sys.files}}' }, { type: 'containerNode' }),
+        width: 420,
+        height: 280,
+        style: { width: 420, height: 280, borderRadius: 8 },
+        parentId: undefined
+      },
+      {
+        ...makeNode('inner', 'code', { code: 'return 1' }, { type: 'taskNode', parentId: 'box' }),
+        width: 180,
+        height: 64,
+        style: { width: 180 }
+      }
+    ]
+    const doc = graphToDocument(nodes, [], 'Sized', { custom: { token: 2 } })
+    const again = documentToGraph(doc)
+    const box = again.nodes.find((item) => item.id === 'box')
+    const inner = again.nodes.find((item) => item.id === 'inner')
+    expect(inner?.parentId).toBe('box')
+    expect(box?.width).toBe(420)
+    expect(box?.height).toBe(280)
+    expect(box?.style).toEqual({ width: 420, height: 280, borderRadius: 8 })
+    expect(again.nodes.find((item) => item.id === 'begin')?.data.form).toEqual({
+      count: 3,
+      flag: true,
+      nested: { n: 1 }
+    })
+    expect(parseDocument(serializeDocument(doc))).toEqual(doc)
+  })
+
+  it('persists logical sourceHandle ids, not physical start#N', () => {
+    const nodes = [makeNode('begin', 'start', {}), makeNode('a', 'agent', {}), makeNode('b', 'agent', {})]
+    const edges = [
+      makeEdge('e1', 'begin', 'a', 'start#0'),
+      makeEdge('e2', 'begin', 'b', 'start#1')
+    ]
+    const doc = graphToDocument(nodes, edges, 'Handles')
+    expect(doc.graph.edges.map((item) => item.sourceHandle)).toEqual(['start', 'start'])
+    expect(doc.components.begin?.downstream).toEqual(['a', 'b'])
+
+    const imported = documentToGraph(
+      parseDocument(
+        JSON.stringify({
+          graph: {
+            nodes: [
+              { id: 'begin', position: { x: 0, y: 0 }, data: { label: 'start', name: 'start', form: {} } },
+              { id: 'a', position: { x: 1, y: 0 }, data: { label: 'agent', name: 'a', form: {} } }
+            ],
+            edges: [{ id: 'e1', source: 'begin', target: 'a', sourceHandle: 'start#3' }]
+          },
+          components: {}
+        })
+      )
+    )
+    expect(imported.edges[0]?.sourceHandle).toBe('start')
+  })
+
+  it('parses {title, dsl}, bare {nodes, edges}, and graph without components', () => {
+    const wrapped = parseDocument(
+      JSON.stringify({
+        title: { zh: '中文名', en: 'English' },
+        dsl: {
+          graph: {
+            nodes: [{ id: 'begin', position: { x: 0, y: 0 }, data: { label: 'Begin', name: 'begin', form: {} } }],
+            edges: []
+          },
+          components: {},
+          globals: { k: 1 }
+        }
+      })
+    )
+    expect(wrapped.title).toBe('中文名')
+    expect(wrapped.globals).toEqual({ k: 1 })
+    expect(documentToGraph(wrapped).nodes[0]?.data.label).toBe('start')
+
+    const bare = parseDocument(
+      JSON.stringify({
+        title: 'Bare',
+        nodes: [{ id: 'begin', position: { x: 0, y: 0 }, data: { label: 'start', name: 'start', form: {} } }],
+        edges: [{ id: 'e1', source: 'begin', target: 'begin' }]
+      })
+    )
+    expect(bare.title).toBe('Bare')
+    expect(bare.graph.nodes).toHaveLength(1)
+    expect(bare.graph.edges).toHaveLength(1)
+
+    const graphOnly = parseDocument(
+      JSON.stringify({
+        graph: {
+          nodes: [{ id: 'begin', position: { x: 0, y: 0 }, data: { label: 'start', name: 'start', form: {} } }],
+          edges: []
+        }
+      })
+    )
+    expect(graphOnly.version).toBe(1)
+    expect(graphOnly.title).toBe('Untitled')
+    expect(graphOnly.graph.nodes).toHaveLength(1)
   })
 
   it('strips a legacy extent flag from container children', () => {

@@ -7,8 +7,9 @@ import { listCategories } from '@/core/registry'
 import type { OperatorDefinition } from '@/core/schema'
 import { useFlowStore } from '@/state/flow-store'
 import { useUiStore } from '@/state/ui-store'
+import { FLYOUT_WIDTH } from './palette-width'
 
-export const FLYOUT_WIDTH = 280
+export { FLYOUT_WIDTH }
 
 /** 某一类别下的工具列表，贴在悬浮组件栏旁边；位置由组件栏算好传入。 */
 export const OperatorFlyout = memo(function OperatorFlyout({

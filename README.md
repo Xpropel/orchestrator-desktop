@@ -54,7 +54,7 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 - **多入口**：可添加多个 `start`；空画布第一个 id/name 为 `start`，其后为 `start:<id>`。最后一个 start 不可删除。
 - **撤销 / 重做**：Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z）。
 - **自动保存**：仅 Electron；已命名且脏时按间隔静默写回（30s / 1m / 2m / 5m，默认 1 分钟）。未命名文件不自动保存。
-- **崩溃恢复**：仅 Electron。变脏 3 秒后写第一份快照，之后每 20 秒写入 `userData/recovery.flow.json`；保存后清除；下次启动若发现快照会询问是否恢复。
+- **崩溃恢复**：Electron 与浏览器模式都可用。变脏 3 秒后写第一份快照，之后每 20 秒续写；保存 / 新建 / 打开后清除；下次启动若发现快照会询问是否恢复（两端同一段 `window.confirm` 文案）。Electron 写入 `userData/recovery.flow.json`，浏览器写入 `localStorage` 键 `orchestrator.recovery`。
 - **导入 JSON**：工具栏「导入 JSON」（Ctrl+I）、或把 `.json` 拖到窗口。识别本格式、RAGFlow DSL（`graph` + `components`、无 `version`）、RAGFlow 外层 `{title, dsl}`、以及裸 `{nodes, edges}`。非本格式按未命名载入，不会覆盖原文件。
 - **导出 JSON**：工具栏下载当前流程（`.flow.json`）。保存 / 另存为写入磁盘。
 - **示例**：工具栏「示例」载入打包内的 `examples/*.flow.json`。
@@ -148,7 +148,7 @@ npm run build
 npm run dist         # 按当前平台打安装包（国内可设 ELECTRON_BUILDER_BINARIES_MIRROR）
 ```
 
-浏览器模式没有 `window.api`：用本机文件选择器打开、用下载保存；崩溃恢复、最近文件与自动保存不可用。
+浏览器模式没有 `window.api`：用本机文件选择器打开、用下载保存；最近文件与自动保存不可用。崩溃恢复走 `localStorage`（键 `orchestrator.recovery`，恢复提示与 Electron 相同）。
 
 产物目录：`out/`（编译）、`dist/`（安装包）。
 

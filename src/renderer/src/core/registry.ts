@@ -1,8 +1,7 @@
 import { nanoid } from 'nanoid'
 import { deepClone } from './clone'
-import { parseCases, parseCategories } from './form-items'
 import { HANDLE_APPROVED, HANDLE_ELSE, HANDLE_END, HANDLE_REJECTED, HANDLE_START } from './handles'
-import type { NodeKind, OperatorCategory, OperatorDefinition, OperatorLibrary, ParamField } from './schema'
+import { isRecord, type NodeKind, type OperatorCategory, type OperatorDefinition, type OperatorLibrary, type ParamField } from './schema'
 import type { FlowNodeType } from './types'
 
 interface SourceHandle {
@@ -125,6 +124,36 @@ export function getKindForNodeType(type: string | undefined): NodeKind | undefin
   return NODE_TYPE_TO_KIND[type as FlowNodeType]
 }
 
+function uniqueHandleId(raw: string, used: Set<string>): string {
+  let id = raw
+  let suffix = 1
+  while (used.has(id)) {
+    id = `${raw}-${suffix}`
+    suffix += 1
+  }
+  used.add(id)
+  return id
+}
+
+function branchOutletHandles(
+  items: unknown,
+  labelKey: 'label' | 'name',
+  fallbackPrefix: string,
+  used: Set<string>
+): SourceHandle[] {
+  if (!Array.isArray(items)) return []
+  const handles: SourceHandle[] = []
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index]
+    const rec = isRecord(item) ? item : null
+    const rawId = rec && typeof rec.id === 'string' ? rec.id.trim() : ''
+    const rawLabel = rec && typeof rec[labelKey] === 'string' ? rec[labelKey].trim() : ''
+    const id = uniqueHandleId(rawId.length > 0 ? rawId : `${fallbackPrefix}-${index}`, used)
+    handles.push({ id, label: rawLabel || id })
+  }
+  return handles
+}
+
 export function getSourceHandles(type: string, form: Record<string, unknown>): SourceHandle[] {
   const operator = getOperator(type)
   if (operator.kind === 'end' || operator.kind === 'break' || operator.kind === 'note') {
@@ -137,13 +166,14 @@ export function getSourceHandles(type: string, form: Record<string, unknown>): S
     ]
   }
   if (operator.kind === 'branch') {
-    const handles: SourceHandle[] = []
-    for (const item of parseCases(form.cases)) {
-      handles.push({ id: item.id, label: item.label || item.id })
+    const used = new Set<string>()
+    if (operator.constraints?.hasElseBranch) {
+      used.add(HANDLE_ELSE)
     }
-    for (const item of parseCategories(form.categories)) {
-      handles.push({ id: item.id, label: item.name || item.id })
-    }
+    const handles = [
+      ...branchOutletHandles(form.cases, 'label', 'case', used),
+      ...branchOutletHandles(form.categories, 'name', 'category', used)
+    ]
     if (operator.constraints?.hasElseBranch) {
       handles.push({ id: HANDLE_ELSE, label: HANDLE_ELSE })
     }
@@ -162,7 +192,7 @@ export function getSourceHandles(type: string, form: Record<string, unknown>): S
 
 export function getTargetHandles(type: string): SourceHandle[] {
   const operator = getOperator(type)
-  if (operator.kind === 'start' || operator.kind === 'note') {
+  if (operator.kind === 'start' || operator.kind === 'loopStart' || operator.kind === 'note') {
     return []
   }
   return [{ id: HANDLE_END, label: HANDLE_END }]

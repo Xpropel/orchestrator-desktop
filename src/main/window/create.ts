@@ -1,7 +1,9 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
+import { EDITABLE_FIELD_JS } from '../../shared/text-input'
 import type { MenuAction } from '../../preload/index.d'
+import { nativeEditCommand } from '../menu/native-edit'
 import { attachNavigationGuard, attachWindowOpenHandler } from '../security/navigation'
 import { APP_TITLE } from './app-state'
 import { attachCloseGuard } from './close-guard'
@@ -14,9 +16,60 @@ function resolvePreloadPath(): string {
   return join(__dirname, '../preload/index.mjs')
 }
 
+function applyNativeEdit(win: BrowserWindow, command: ReturnType<typeof nativeEditCommand>): void {
+  if (!command || win.isDestroyed()) {
+    return
+  }
+  switch (command) {
+    case 'undo':
+      win.webContents.undo()
+      return
+    case 'redo':
+      win.webContents.redo()
+      return
+    case 'copy':
+      win.webContents.copy()
+      return
+    case 'paste':
+      win.webContents.paste()
+      return
+    case 'delete':
+      win.webContents.delete()
+  }
+}
+
+/**
+ * 隐藏菜单栏时加速键仍走这里。复制/粘贴/撤销/删除在文本框内必须用
+ * `webContents.copy()` 等原生命令：菜单拦截了按键，渲染进程里的
+ * `document.execCommand` 没有用户手势，经常是空操作。
+ */
 export function sendMenuAction(action: MenuAction): void {
   const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-  win?.webContents.send('menu:action', action)
+  if (!win || win.isDestroyed()) {
+    return
+  }
+  const native = nativeEditCommand(action)
+  if (!native) {
+    win.webContents.send('menu:action', action)
+    return
+  }
+  void win.webContents
+    .executeJavaScript(EDITABLE_FIELD_JS)
+    .then((inText: unknown) => {
+      if (win.isDestroyed()) {
+        return
+      }
+      if (inText === true) {
+        applyNativeEdit(win, native)
+        return
+      }
+      win.webContents.send('menu:action', action)
+    })
+    .catch(() => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('menu:action', action)
+      }
+    })
 }
 
 export function createWindow(): BrowserWindow {

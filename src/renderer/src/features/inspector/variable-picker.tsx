@@ -1,4 +1,4 @@
-import { useMemo, useState, type JSX } from 'react'
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { getAvailableVariables, isTypeCompatible, type AvailableVariable, type VariableScope } from '@/core/variables'
 import { resolveAcceptTypes } from '@/core/variables'
 import type { ParamField, VarType } from '@/core/schema'
@@ -48,13 +48,17 @@ export function VariablePicker({
     items: items.filter((item) => item.scope === scope)
   })).filter((group) => group.items.length > 0)
 
+  const current = value ?? ''
+  const known = current.length === 0 || items.some((item) => formatVariableRef(item) === current)
+
   return (
     <select
       className="h-8 w-full rounded-md border border-border bg-elevated px-2 text-sm text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-      value={value ?? ''}
+      value={current}
       onChange={(event) => onSelect(event.target.value)}
     >
       {allowEmpty ? <option value="">（未选择）</option> : null}
+      {known ? null : <option value={current}>{`${current} · 当前`}</option>}
       {grouped.map((group) => (
         <optgroup key={group.scope} label={SCOPE_LABEL[group.scope]}>
           {group.items.map((item) => {
@@ -81,6 +85,7 @@ export function InsertVariableButton({
   onInsert: (ref: string) => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
   const nodes = useFlowStore((state) => state.nodes)
   const edges = useFlowStore((state) => state.edges)
   const items = useMemo(() => {
@@ -93,8 +98,26 @@ export function InsertVariableButton({
     items: items.filter((item) => item.scope === scope)
   })).filter((group) => group.items.length > 0)
 
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: PointerEvent): void => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointer)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onPointer)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         type="button"
         className="rounded-md border border-border px-1.5 py-0.5 text-[11px] text-secondary hover:bg-elevated hover:text-primary"

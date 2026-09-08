@@ -1,3 +1,4 @@
+import { pickDocumentTitle } from '@/core/dsl'
 import { migrateLabel, resolveOperatorType } from '@/core/migrations'
 import { hasOperator } from '@/core/registry'
 import { isRecord } from '@/core/schema'
@@ -99,24 +100,7 @@ function asComponents(value: unknown): Record<string, unknown> {
 
 /** 文档内 title → 去后缀文件名 → Untitled。外层 i18n 对象取 zh/en。 */
 export function pickTitle(value: unknown): string {
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value.trim()
-  }
-  if (!isRecord(value)) {
-    return ''
-  }
-  for (const key of ['zh', 'en', 'de']) {
-    const part = value[key]
-    if (typeof part === 'string' && part.trim().length > 0) {
-      return part.trim()
-    }
-  }
-  for (const part of Object.values(value)) {
-    if (typeof part === 'string' && part.trim().length > 0) {
-      return part.trim()
-    }
-  }
-  return ''
+  return pickDocumentTitle(value)
 }
 
 export function titleFromFileName(fileName: string): string {

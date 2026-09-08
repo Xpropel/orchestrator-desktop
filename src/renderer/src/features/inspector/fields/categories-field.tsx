@@ -87,12 +87,10 @@ export function CategoriesField({ nodeId, field, value, onChange }: SchemaFieldP
           </div>
         ))}
         <Button
-          onClick={() =>
-            commit([
-              ...readLatest(),
-              { id: nanoid(8), name: `Category ${readLatest().length + 1}`, description: '' }
-            ])
-          }
+          onClick={() => {
+            const latest = readLatest()
+            commit([...latest, { id: nanoid(8), name: `Category ${latest.length + 1}`, description: '' }])
+          }}
         >
           <Plus className="h-3 w-3" />
           添加类别

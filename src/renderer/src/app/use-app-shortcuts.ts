@@ -5,7 +5,7 @@ import { useFlowStore } from '@/state/flow-store'
 import { isTextInputTarget } from '@/ui/is-text-input-target'
 import type { MenuAction } from '../../../preload/index.d'
 
-/** 浏览器模式快捷键映射。文本框内不接管编辑类按键，留给原生撤销/输入。 */
+/** 浏览器模式快捷键映射。文本框内只放行保存，不抢新建/打开/导入，也不接管编辑键。 */
 export function resolveBrowserShortcut(event: KeyboardEvent): MenuAction | null {
   const key = event.key.toLowerCase()
   const mod = event.ctrlKey || event.metaKey
@@ -17,12 +17,12 @@ export function resolveBrowserShortcut(event: KeyboardEvent): MenuAction | null 
     return null
   }
 
+  if (key === 's') return event.shiftKey ? 'saveAs' : 'save'
+  if (inText) return null
+
   if (key === 'n') return 'new'
   if (key === 'o') return 'open'
   if (key === 'i') return 'importJson'
-  if (key === 's') return event.shiftKey ? 'saveAs' : 'save'
-
-  if (inText) return null
 
   if (key === 'z' && event.shiftKey) return 'redo'
   if (key === 'z') return 'undo'

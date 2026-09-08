@@ -11,7 +11,11 @@ export function useFlowValidation(): void {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setIssues(validateFlow(nodes, edges, globals))
+      try {
+        setIssues(validateFlow(nodes, edges, globals))
+      } catch {
+        // keep the last successful pass if a rule throws unexpectedly
+      }
     }, 300)
     return () => window.clearTimeout(timer)
   }, [nodes, edges, globals, setIssues])

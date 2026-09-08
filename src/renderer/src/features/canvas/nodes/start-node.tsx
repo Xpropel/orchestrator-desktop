@@ -35,11 +35,18 @@ export const StartNode = memo(function StartNode({
         'orchestrator-card relative flex items-center gap-2 rounded-full border border-border bg-elevated px-4 py-2 shadow-sm',
         selected && 'orchestrator-card-selected'
       )}
-      style={{ ...cardBoxStyle(width, height), minHeight: orderedPortsMinHeight(occupied) }}
+      style={{
+        ...cardBoxStyle(width, height),
+        minHeight: Math.max(PILL_MIN_HEIGHT, orderedPortsMinHeight(occupied))
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <CardResizer selected={selected} minWidth={PILL_MIN_WIDTH} minHeight={PILL_MIN_HEIGHT} />
+      <CardResizer
+        selected={selected}
+        minWidth={PILL_MIN_WIDTH}
+        minHeight={Math.max(PILL_MIN_HEIGHT, orderedPortsMinHeight(occupied))}
+      />
       <NodeIssueBadge nodeId={id} />
       <NodeHoverToolbar nodeId={id} visible={hovered || selected} showDelete={canDelete} showCopy={false} />
       <span

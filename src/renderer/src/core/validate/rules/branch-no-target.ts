@@ -1,3 +1,4 @@
+import { logicalHandleId } from '../../handles'
 import { getSourceHandles } from '../../registry'
 import type { FlowEdge, FlowNode } from '../../types'
 import type { OperatorDefinition } from '../../schema'
@@ -12,7 +13,9 @@ export function ruleBranchNoTarget(
   const issues: FlowIssue[] = []
   const handles = getSourceHandles(operator.type, node.data.form)
   for (const handle of handles) {
-    const hasTarget = edges.some((edge) => edge.source === node.id && (edge.sourceHandle ?? null) === handle.id)
+    const hasTarget = edges.some(
+      (edge) => edge.source === node.id && (logicalHandleId(edge.sourceHandle) ?? null) === handle.id
+    )
     if (!hasTarget) {
       issues.push(
         issue('warning', 'BRANCH_NO_TARGET', `分支 ${handle.label} 没有出边`, {

@@ -51,16 +51,16 @@ export function IssuesPanel(): JSX.Element {
             {errors.length > 0 ? (
               <div>
                 <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-red-400">Error</p>
-                {errors.map((issue) => (
-                  <IssueRow key={issue.id} issue={issue} />
+                {errors.map((issue, index) => (
+                  <IssueRow key={`${issue.id}:${index}`} issue={issue} />
                 ))}
               </div>
             ) : null}
             {warnings.length > 0 ? (
               <div>
                 <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-amber-400">Warning</p>
-                {warnings.map((issue) => (
-                  <IssueRow key={issue.id} issue={issue} />
+                {warnings.map((issue, index) => (
+                  <IssueRow key={`${issue.id}:${index}`} issue={issue} />
                 ))}
               </div>
             ) : null}

@@ -21,13 +21,26 @@ export function isRecoveryRecord(value: unknown): value is RecoveryRecord {
   )
 }
 
+let ioChain: Promise<void> = Promise.resolve()
+
+function serializeIo(task: () => Promise<void>): Promise<void> {
+  const run = ioChain.then(task, task)
+  ioChain = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
 export async function writeRecovery(record: RecoveryRecord): Promise<void> {
-  const bytes = Buffer.byteLength(record.content, 'utf8')
-  if (bytes > MAX_RECOVERY_BYTES) {
-    console.warn(`[recovery] snapshot ${bytes} bytes exceeds ${MAX_RECOVERY_BYTES}, skip write`)
-    return
-  }
-  await writeFile(recoveryPath(), JSON.stringify(record), 'utf8')
+  return serializeIo(async () => {
+    const bytes = Buffer.byteLength(record.content, 'utf8')
+    if (bytes > MAX_RECOVERY_BYTES) {
+      console.warn(`[recovery] snapshot ${bytes} bytes exceeds ${MAX_RECOVERY_BYTES}, skip write`)
+      return
+    }
+    await writeFile(recoveryPath(), JSON.stringify(record), 'utf8')
+  })
 }
 
 export async function readRecovery(): Promise<RecoveryRecord | null> {
@@ -40,5 +53,7 @@ export async function readRecovery(): Promise<RecoveryRecord | null> {
 }
 
 export async function clearRecovery(): Promise<void> {
-  await rm(recoveryPath(), { force: true })
+  return serializeIo(async () => {
+    await rm(recoveryPath(), { force: true })
+  })
 }

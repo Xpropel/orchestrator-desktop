@@ -17,6 +17,7 @@ import {
   reorderOutgoingEdges,
   snapshotKeyOf
 } from '@/core/graph'
+import { invalidNodeNameReason } from '@/core/variables'
 import type { FlowEdge, FlowNode } from '@/core/types'
 import { createClipboardSlice } from './clipboard-slice'
 import { createContainerSlice, ensureLoopStart } from './container-slice'
@@ -26,6 +27,7 @@ import {
   dropIds,
   emptyCanvas,
   isDirtyNodeChange,
+  neutralizeInitialDimensionChange,
   pruneDraft,
   pushSnapshot,
   snapshotOf,
@@ -65,12 +67,23 @@ export const useFlowStore = create<FlowState>()(
       clipboard: null,
 
       onNodesChange: (changes) => {
+        if (
+          changes.some(
+            (change) =>
+              change.type === 'remove' ||
+              change.type === 'add' ||
+              (change.type === 'position' && change.dragging === false) ||
+              (change.type === 'dimensions' && change.resizing === false)
+          )
+        ) {
+          flushFormHistory()
+        }
         set((state) => {
           const removingIds = changes.filter((change) => change.type === 'remove').map((change) => change.id)
           const protectedIds = idsProtectedFromRemoval(state.nodes, removingIds)
-          const nextChanges = changes.filter(
-            (change) => change.type !== 'remove' || !protectedIds.has(change.id)
-          )
+          const nextChanges = changes
+            .filter((change) => change.type !== 'remove' || !protectedIds.has(change.id))
+            .map((change) => neutralizeInitialDimensionChange(change, state.nodes, changes))
           const shouldRecord =
             nextChanges.some((change) => change.type === 'remove' || change.type === 'add') ||
             nextChanges.some((change) => change.type === 'dimensions' && change.resizing === false) ||
@@ -109,11 +122,19 @@ export const useFlowStore = create<FlowState>()(
       },
 
       onEdgesChange: (changes: EdgeChange<FlowEdge>[]) => {
+        if (changes.some((change) => change.type === 'remove' || change.type === 'add')) {
+          flushFormHistory()
+        }
         set((state) => {
+          const removing = changes.filter((change) => change.type === 'remove').map((change) => change.id)
+          const removingExisting = removing.some((id) => state.edges.some((edge) => edge.id === id))
           state.edges = applyEdgeChanges(changes, state.edges).map((edge) =>
             normalizeStoredEdge(state.nodes, edge)
           )
-          if (changes.some((change) => change.type === 'remove' || change.type === 'add')) {
+          if (
+            changes.some((change) => change.type === 'add') ||
+            (changes.some((change) => change.type === 'remove') && removingExisting)
+          ) {
             pushSnapshot(state)
           }
           syncDirtyFromSnapshot(state)
@@ -153,9 +174,18 @@ export const useFlowStore = create<FlowState>()(
           const node = state.nodes.find((item) => item.id === id)
           if (!node) return
           const oldName = node.data.name
-          Object.assign(node.data, patch)
-          if (typeof patch.name === 'string' && patch.name !== oldName) {
-            applyRename(state, oldName, patch.name)
+          const nextPatch = { ...patch }
+          if (typeof nextPatch.name === 'string') {
+            const name = nextPatch.name
+            const taken = state.nodes.some((item) => item.id !== id && item.data.name === name)
+            if (invalidNodeNameReason(name) || taken) {
+              delete nextPatch.name
+              state.revision += 1
+            }
+          }
+          Object.assign(node.data, nextPatch)
+          if (typeof nextPatch.name === 'string' && nextPatch.name !== oldName) {
+            applyRename(state, oldName, nextPatch.name)
           }
           syncDirtyFromSnapshot(state)
         })
@@ -223,6 +253,7 @@ export const useFlowStore = create<FlowState>()(
       },
 
       setTitle: (title) => {
+        flushFormHistory()
         set((state) => {
           state.title = title
           pushSnapshot(state)

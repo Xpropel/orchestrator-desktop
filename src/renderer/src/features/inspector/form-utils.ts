@@ -1,14 +1,25 @@
-import { asStringArray } from '@/core/form/as-string-array'
+import { asStringArray, clampNumber, coerceFiniteNumber } from '@/core/form/as-string-array'
 import { valuesEqual } from '@/core/form/values-equal'
 
-export { asStringArray, valuesEqual }
+export { asStringArray, clampNumber, coerceFiniteNumber, valuesEqual }
 
 export function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
 }
 
 export function asNumber(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return coerceFiniteNumber(value) ?? fallback
+}
+
+export function insertAtCaret(
+  text: string,
+  insert: string,
+  start: number,
+  end: number
+): { next: string; caret: number } {
+  const from = Math.max(0, Math.min(start, text.length))
+  const to = Math.max(from, Math.min(end, text.length))
+  return { next: `${text.slice(0, from)}${insert}${text.slice(to)}`, caret: from + insert.length }
 }
 
 export function asBoolean(value: unknown, fallback = false): boolean {

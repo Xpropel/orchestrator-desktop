@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react'
+import { committedTitle, registerTitleEditFlush } from '@/app/title-edit'
 import { AlertTriangle, Download, FilePlus, FolderOpen, Moon, Save, Sun, Timer, Upload } from 'lucide-react'
 import { ACTION_LABEL } from '@shared/action-labels'
 import { exportJson, importJson, newFlow, openFlow, saveFlow, saveFlowAs } from '@/features/files/file-actions'
@@ -28,6 +29,7 @@ function fileLabel(filePath: string | null, title: string): string {
 export function Toolbar(): JSX.Element {
   const title = useFlowStore((state) => state.title)
   const filePath = useFlowStore((state) => state.filePath)
+  const revision = useFlowStore((state) => state.revision)
   const dirty = useFlowStore((state) => state.dirty)
   const nodeCount = useFlowStore((state) => state.nodes.length)
   const edgeCount = useFlowStore((state) => state.edges.length)
@@ -43,17 +45,36 @@ export function Toolbar(): JSX.Element {
   const lastAutosaveAt = useSettingsStore((state) => state.lastAutosaveAt)
 
   const commitTitle = (): void => {
-    const next = titleDraft.trim() || 'Untitled'
+    const next = committedTitle(titleDraft)
     if (next !== title) {
       setTitle(next)
     }
     setEditingTitle(false)
   }
 
+  const commitRef = useRef(commitTitle)
+  commitRef.current = commitTitle
+  const editingRef = useRef(editingTitle)
+  editingRef.current = editingTitle
+
+  useEffect(() => {
+    registerTitleEditFlush(() => {
+      if (editingRef.current) {
+        commitRef.current()
+      }
+    })
+    return () => registerTitleEditFlush(null)
+  }, [])
+
+  useEffect(() => {
+    setEditingTitle(false)
+    setTitleDraft(title)
+  }, [filePath, revision, title])
+
   return (
     // 悬浮在画布顶部、背景透明；三组之间的空白不拦截指针，画布仍可从那里拖动。
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-toolbar items-center justify-between gap-2 px-2">
-      <div className="pointer-events-auto flex min-w-0 items-center gap-0.5">
+    <header className="orch-top-toolbar pointer-events-none absolute inset-x-0 top-0 z-30 flex h-toolbar items-center justify-between gap-2 px-2">
+      <div className="pointer-events-auto flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
         <ToolButton onClick={() => void newFlow()}>
           <FilePlus className="h-3.5 w-3.5" />
           {ACTION_LABEL.new}
@@ -98,6 +119,8 @@ export function Toolbar(): JSX.Element {
                 commitTitle()
               }
               if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
                 setTitleDraft(title)
                 setEditingTitle(false)
               }

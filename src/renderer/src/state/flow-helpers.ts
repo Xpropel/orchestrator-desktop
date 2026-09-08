@@ -58,6 +58,23 @@ export function isDirtyNodeChange(change: NodeChange<RfNode>, nodes: FlowNode[])
   return false
 }
 
+/** 首次量测不要写入 width/height，否则会把未保存文档标脏。 */
+export function neutralizeInitialDimensionChange(
+  change: NodeChange<RfNode>,
+  nodes: FlowNode[],
+  batch: readonly NodeChange<RfNode>[] = []
+): NodeChange<RfNode> {
+  if (change.type !== 'dimensions') return change
+  const node = nodes.find((item) => item.id === change.id)
+  const hadSize = node != null && (typeof node.width === 'number' || typeof node.height === 'number')
+  if (!hadSize && change.resizing !== true) {
+    const pairedMove = batch.some((item) => item.type === 'position' && item.id === change.id)
+    if (pairedMove) return change
+    return { ...change, resizing: undefined, setAttributes: undefined }
+  }
+  return change
+}
+
 export function unwrap<T>(value: T): T {
   try {
     return current(value)

@@ -1,5 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 
+/** Incoming store value is our own commit echo — keep in-progress keystrokes. */
+export function nextDebouncedFromIncoming(
+  local: string,
+  committed: string,
+  incoming: string
+): { local: string; committed: string } | null {
+  if (local !== committed && incoming === committed) {
+    return null
+  }
+  if (incoming === local && incoming === committed) {
+    return null
+  }
+  if (incoming === local) {
+    return { local, committed: incoming }
+  }
+  return { local: incoming, committed: incoming }
+}
+
 export function useDebouncedCommit(
   value: string,
   onCommit: (value: string) => void,
@@ -8,6 +26,8 @@ export function useDebouncedCommit(
 ): {
   local: string
   setLocal: (next: string) => void
+  commitNow: () => void
+  revert: () => void
 } {
   const [local, setLocal] = useState(value)
   const committedRef = useRef(value)
@@ -19,8 +39,12 @@ export function useDebouncedCommit(
   localRef.current = local
 
   useEffect(() => {
-    setLocal(value)
-    committedRef.current = value
+    const next = nextDebouncedFromIncoming(localRef.current, committedRef.current, value)
+    if (!next) return
+    committedRef.current = next.committed
+    if (next.local !== localRef.current) {
+      setLocal(next.local)
+    }
   }, [value])
 
   const flush = (next: string): void => {
@@ -49,5 +73,15 @@ export function useDebouncedCommit(
     }
   }, [])
 
-  return { local, setLocal }
+  const commitNow = (): void => {
+    if (localRef.current !== committedRef.current) {
+      flush(localRef.current)
+    }
+  }
+
+  const revert = (): void => {
+    setLocal(committedRef.current)
+  }
+
+  return { local, setLocal, commitNow, revert }
 }

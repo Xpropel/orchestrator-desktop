@@ -1,5 +1,6 @@
 import dagre from '@dagrejs/dagre'
 import type { FlowEdge, FlowNode } from '../types'
+import { getNodeBoxSize } from './containers'
 
 const FALLBACK_WIDTH = 240
 const FALLBACK_HEIGHT = 80
@@ -23,10 +24,7 @@ function nodeSize(node: FlowNode, sizes: Record<string, { width: number; height:
 } {
   const resized = sizes[node.id]
   if (resized) return resized
-  return {
-    width: node.measured?.width ?? node.width ?? FALLBACK_WIDTH,
-    height: node.measured?.height ?? node.height ?? FALLBACK_HEIGHT
-  }
+  return getNodeBoxSize(node)
 }
 
 function layoutLevel(

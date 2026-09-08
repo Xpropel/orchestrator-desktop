@@ -11,7 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import { flushSync } from 'react-dom'
-import { Position, useStoreApi, useUpdateNodeInternals } from '@xyflow/react'
+import { Position, useStore, useStoreApi, useUpdateNodeInternals } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 import { HANDLE_START, HANDLE_START_NEW, isLogicalStartHandle, physicalSourceHandle } from '@/core/handles'
 import { cn } from '@/ui/cn'
@@ -85,6 +85,10 @@ export const OrderedSourcePorts = memo(function OrderedSourcePorts({
   const updateNodeInternals = useUpdateNodeInternals()
   const rfStore = useStoreApi()
   const occupied = outgoingIds.length
+  const measuredKey = useStore((state) => {
+    const node = state.nodeLookup.get(nodeId)
+    return `${node?.measured?.width ?? node?.width ?? 0}:${node?.measured?.height ?? node?.height ?? 0}`
+  })
   const [drag, setDrag] = useState<PortDrag | null>(null)
   const dragRef = useRef<PortDrag | null>(null)
   const moveRaf = useRef(0)
@@ -102,7 +106,7 @@ export const OrderedSourcePorts = memo(function OrderedSourcePorts({
 
   useLayoutEffect(() => {
     measureHandles()
-  }, [drag, outgoingIds, measureHandles])
+  }, [drag, outgoingIds, measuredKey, measureHandles])
 
   const cancelDrag = useCallback(() => {
     if (moveRaf.current) {

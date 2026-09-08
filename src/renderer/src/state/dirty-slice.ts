@@ -7,16 +7,20 @@ import type { DirtySlice } from './flow-state'
 export const createDirtySlice: FlowSlice<DirtySlice> = (set) => ({
   dirty: false,
   savedSnapshotKey: '',
-  markSaved: (filePath) => {
+  markSaved: (filePath, written) => {
     set((state) => {
       state.filePath = filePath
+      const pathTitle = titleFromPath(filePath)
       if (state.title === 'Untitled') {
-        state.title = titleFromPath(filePath)
+        state.title = pathTitle
         const last = state.historyPast[state.historyPast.length - 1]
         if (last) last.title = state.title
       }
-      state.savedSnapshotKey = keyOf(state.nodes, state.edges, state.title, state.globals)
-      state.dirty = false
+      const source = written ?? state
+      const savedTitle = source.title === 'Untitled' ? pathTitle : source.title
+      state.savedSnapshotKey = keyOf(source.nodes, source.edges, savedTitle, source.globals ?? {})
+      state.dirty =
+        keyOf(state.nodes, state.edges, state.title, state.globals) !== state.savedSnapshotKey
     })
   },
   // 当前内容没有已保存的对应物：哨兵 key 不会与真实 snapshotKey 相等，后续 syncDirtyFromSnapshot 保持 dirty。

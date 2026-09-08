@@ -135,4 +135,36 @@ describe('registry', () => {
     expect(getSourceHandles('dataset', {})).toEqual([{ id: 'start', label: 'start' }])
     expect(getTargetHandles('dataset')).toEqual([{ id: 'end', label: 'end' }])
   })
+
+  it('exposes list/text operation conditionals and human-input field outputs', () => {
+    const list = getOperator('list-operation')
+    expect(list.params.map((item) => item.key)).toEqual([
+      'items',
+      'operation',
+      'expression',
+      'filterExpression',
+      'start',
+      'count'
+    ])
+    expect(list.params.find((item) => item.key === 'expression')).toMatchObject({
+      required: true,
+      showWhen: { key: 'operation', equals: 'map' }
+    })
+    expect(list.params.find((item) => item.key === 'filterExpression')).toMatchObject({
+      required: true,
+      showWhen: { key: 'operation', equals: 'filter' }
+    })
+
+    const text = getOperator('text-operation')
+    expect(text.params.find((item) => item.key === 'joinWith')).toMatchObject({
+      required: true,
+      default: ',',
+      showWhen: { key: 'operation', equals: 'join' }
+    })
+    expect(getDefaultForm('text-operation').joinWith).toBe(',')
+
+    const human = getOperator('human-input')
+    expect(human.outputs).toEqual([{ name: 'values', type: 'object' }])
+    expect(human.constraints).toEqual({ outputsFromParam: 'fields' })
+  })
 })

@@ -100,15 +100,58 @@ export function toAbsolutePosition(relative: XYPosition, parent: FlowNode, nodes
   return { x: relative.x + parentAbs.x, y: relative.y + parentAbs.y }
 }
 
+function readStyleSize(style: object | undefined, key: 'width' | 'height'): number | undefined {
+  if (!style || typeof style !== 'object') return undefined
+  const value = (style as Record<string, unknown>)[key]
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+  }
+  return undefined
+}
+
+function fallbackNodeSize(node: FlowNode): { width: number; height: number } {
+  if (hasOperator(node.data.label)) {
+    return estimateNodeSize(node.data.label)
+  }
+  if (getKindForNodeType(node.type) === 'container') {
+    return { width: CONTAINER_DEFAULT_WIDTH, height: CONTAINER_DEFAULT_HEIGHT }
+  }
+  return { width: 240, height: 80 }
+}
+
+/** 量测值 → 显式 width/height → style → 按算子/类型估计。撤销拉伸后仍能给出盒子。 */
+export function getNodeBoxSize(node: FlowNode): { width: number; height: number } {
+  const fallback = fallbackNodeSize(node)
+  return {
+    width: node.measured?.width ?? node.width ?? readStyleSize(node.style, 'width') ?? fallback.width,
+    height: node.measured?.height ?? node.height ?? readStyleSize(node.style, 'height') ?? fallback.height
+  }
+}
+
 export function getNodeAbsoluteBox(node: FlowNode, nodes: FlowNode[]): NodeBox {
   const position = getNodeAbsolutePosition(node, nodes)
-  const fallback =
-    getKindForNodeType(node.type) === 'container'
-      ? { width: CONTAINER_DEFAULT_WIDTH, height: CONTAINER_DEFAULT_HEIGHT }
-      : { width: 240, height: 80 }
-  const width = node.measured?.width ?? node.width ?? fallback.width
-  const height = node.measured?.height ?? node.height ?? fallback.height
+  const { width, height } = getNodeBoxSize(node)
   return { x: position.x, y: position.y, width, height }
+}
+
+const CONTAINER_CHILD_PAD = 16
+
+/** 容器要包住直接子节点时的最小尺寸（相对坐标 + 子盒子 + 内边距）。 */
+export function minContainerSizeForChildren(
+  containerId: string,
+  nodes: FlowNode[]
+): { width: number; height: number } {
+  let width = CONTAINER_MIN_WIDTH
+  let height = CONTAINER_MIN_HEIGHT
+  for (const child of nodes) {
+    if (child.parentId !== containerId) continue
+    const size = getNodeBoxSize(child)
+    width = Math.max(width, Math.ceil(child.position.x + size.width + CONTAINER_CHILD_PAD))
+    height = Math.max(height, Math.ceil(child.position.y + size.height + CONTAINER_CHILD_PAD))
+  }
+  return { width, height }
 }
 
 export function pointInBox(point: XYPosition, box: NodeBox): boolean {
@@ -129,10 +172,12 @@ export function collectDescendantIds(nodes: FlowNode[], rootId: string): string[
     children.set(node.parentId, list)
   }
   const result: string[] = []
+  const seen = new Set<string>([rootId])
   const stack = [...(children.get(rootId) ?? [])]
   while (stack.length > 0) {
     const id = stack.pop()
-    if (!id) continue
+    if (!id || seen.has(id)) continue
+    seen.add(id)
     result.push(id)
     const nested = children.get(id)
     if (nested) stack.push(...nested)
@@ -199,6 +244,41 @@ export function findIntersectingContainer(
   return best
 }
 
+export function mustRemainInsideContainer(node: FlowNode): boolean {
+  if (!hasOperator(node.data.label)) return false
+  return getOperator(node.data.label).constraints?.onlyInsideContainer === true
+}
+
+export function onlyInsideContainerToast(node: FlowNode): string {
+  const title = hasOperator(node.data.label) ? getOperator(node.data.label).title : node.data.label
+  return `${title} 只能放在循环容器内`
+}
+
+/** 把子节点的相对坐标钳回父容器盒子内（含自身尺寸）。 */
+export function clampPositionInsideParent(node: FlowNode, parent: FlowNode): XYPosition {
+  const parentSize = getNodeBoxSize(parent)
+  const childSize = getNodeBoxSize(node)
+  const maxX = Math.max(0, parentSize.width - childSize.width)
+  const maxY = Math.max(0, parentSize.height - childSize.height)
+  return {
+    x: Math.min(Math.max(0, node.position.x), maxX),
+    y: Math.min(Math.max(0, node.position.y), maxY)
+  }
+}
+
+/** 拖出所有容器时：把 onlyInsideContainer 节点钳回当前父容器，并给出 toast。 */
+export function planKeepInsideContainer(
+  node: FlowNode,
+  nodes: FlowNode[]
+): { parentId: string; position: XYPosition; toast: string } | null {
+  if (!mustRemainInsideContainer(node) || !node.parentId) return null
+  const parent = nodes.find((item) => item.id === node.parentId)
+  if (!parent) return null
+  const position = clampPositionInsideParent(node, parent)
+  if (position.x === node.position.x && position.y === node.position.y) return null
+  return { parentId: parent.id, position, toast: onlyInsideContainerToast(node) }
+}
+
 /** 拖放结束后是否改归属。返回 null 表示保持现状。指针优先，重叠兜底。 */
 export function resolveParentAfterDrag(
   node: FlowNode,
@@ -212,6 +292,7 @@ export function resolveParentAfterDrag(
     return { parentId: hit.id, position: toRelativePosition(abs, hit, nodes) }
   }
   if (!hit && node.parentId) {
+    if (mustRemainInsideContainer(node)) return null
     return { parentId: null, position: abs }
   }
   return null

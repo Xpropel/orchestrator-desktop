@@ -16,6 +16,6 @@ export function issue(
   message: string,
   extra: Pick<FlowIssue, 'nodeId' | 'edgeId' | 'field'> = {}
 ): FlowIssue {
-  const id = [code, extra.nodeId ?? '', extra.edgeId ?? '', extra.field ?? ''].join(':')
+  const id = [code, extra.nodeId ?? '', extra.edgeId ?? '', extra.field ?? '', message].join(':')
   return { id, level, code, message, ...extra }
 }

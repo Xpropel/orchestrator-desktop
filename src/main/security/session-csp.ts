@@ -12,7 +12,7 @@ export function applyContentSecurityPolicy(): void {
       }
     })
   })
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false)
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'clipboard-read' || permission === 'clipboard-sanitized-write')
   })
 }

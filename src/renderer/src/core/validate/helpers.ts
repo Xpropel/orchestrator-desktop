@@ -1,8 +1,9 @@
 import { parentIdOf } from '../graph/parent-id'
+import { logicalHandleId } from '../handles'
 import { getOperator, hasOperator } from '../registry'
 import type { OperatorDefinition } from '../schema'
 import type { FlowEdge, FlowNode } from '../types'
-import { parseReferences } from '../variables'
+import { lookupAvailableVariable, parseReferences } from '../variables'
 
 export { parentIdOf }
 
@@ -34,7 +35,7 @@ export function descendantsFromHandle(sourceId: string, handleId: string, edges:
   const seen = new Set<string>()
   const stack: string[] = []
   for (const edge of outgoing.get(sourceId) ?? []) {
-    if ((edge.handle ?? null) === handleId) stack.push(edge.target)
+    if ((logicalHandleId(edge.handle) ?? null) === handleId) stack.push(edge.target)
   }
   while (stack.length > 0) {
     const current = stack.pop()
@@ -47,9 +48,9 @@ export function descendantsFromHandle(sourceId: string, handleId: string, edges:
   return seen
 }
 
-export function sessionRefKey(value: unknown): string | undefined {
+export function sessionRefKey(value: unknown, knownNames?: Iterable<string>): string | undefined {
   if (typeof value !== 'string' || value.trim().length === 0) return undefined
-  const refs = parseReferences(value)
+  const refs = parseReferences(value, knownNames)
   if (refs.length === 0) return value.trim()
   return `${refs[0]?.node}.${refs[0]?.variable}`
 }
@@ -59,5 +60,5 @@ export function lookupAvailable<T extends { nodeName: string; variable: { name: 
   refNode: string,
   refVar: string
 ): T | undefined {
-  return available.find((item) => item.nodeName === refNode && item.variable.name === refVar)
+  return lookupAvailableVariable(available, refNode, refVar)
 }

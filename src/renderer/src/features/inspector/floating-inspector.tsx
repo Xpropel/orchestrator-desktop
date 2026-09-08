@@ -70,7 +70,6 @@ export function FloatingInspector(): JSX.Element {
 
       {open && card.rect ? (
         <FloatingCard
-          key={nodeId ?? 'flow'}
           rect={card.rect}
           maxHeight={card.maxHeight}
           collapsed={collapsed}
@@ -93,6 +92,7 @@ export function FloatingInspector(): JSX.Element {
           onToggleCollapse={() => setCollapsed((value) => !value)}
         >
           <ErrorBoundary
+            key={nodeId ?? 'flow'}
             fallback={
               <p className="text-xs text-secondary">属性面板渲染失败。请改选其他节点，或检查该算子的表单实现。</p>
             }

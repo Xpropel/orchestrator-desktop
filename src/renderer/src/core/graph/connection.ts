@@ -1,7 +1,7 @@
 import { HANDLE_END, HANDLE_START, logicalHandleId } from '../handles'
 import { getKindForNodeType, getOperator, getSourceHandles, getTargetHandles, hasOperator } from '../registry'
 import type { FlowConnection, FlowEdge, FlowNode } from '../types'
-import { isStartNode } from './kind'
+import { isLoopStartNode, isStartNode } from './kind'
 import { wouldCreateCycle } from './traversal'
 
 function sourceHandleIdsOf(node: FlowNode): string[] {
@@ -31,7 +31,8 @@ export function collectDanglingEdgeIds(nodes: FlowNode[], edges: FlowEdge[]): st
       ? getOperator(source.data.label).kind
       : getKindForNodeType(source.type)
     const isBranch = kind === 'branch'
-    const handleId = edge.sourceHandle ?? (isBranch ? null : HANDLE_START)
+    const rawHandle = edge.sourceHandle ?? (isBranch ? null : HANDLE_START)
+    const handleId = rawHandle == null ? null : (logicalHandleId(rawHandle) ?? rawHandle)
     if (handleId === null || !handles.includes(handleId)) {
       dangling.push(edge.id)
     }
@@ -102,7 +103,14 @@ export function explainInvalidConnection(
     : getKindForNodeType(target.type)
 
   if (sourceKind === 'note' || targetKind === 'note') return '不能连接：便签不能连线'
-  if (targetKind === 'start' || isStartNode(target)) return '不能连接：不能连到开始节点'
+  if (
+    targetKind === 'start' ||
+    targetKind === 'loopStart' ||
+    isStartNode(target) ||
+    isLoopStartNode(target)
+  ) {
+    return '不能连接：不能连到开始节点'
+  }
   if (sourceKind === 'end' || sourceKind === 'break') return '不能连接：该节点没有出口'
   if (!sameContainerBoundary(source, target)) return '不能连接：不能跨容器'
   if (isDuplicateConnection(edges, connection)) return '不能连接：重复的连线'

@@ -87,12 +87,10 @@ export function CasesField({ nodeId, field, value, onChange }: SchemaFieldProps)
           </div>
         ))}
         <Button
-          onClick={() =>
-            commit([
-              ...readLatest(),
-              { id: nanoid(8), label: `Case ${readLatest().length + 1}`, expression: '' }
-            ])
-          }
+          onClick={() => {
+            const latest = readLatest()
+            commit([...latest, { id: nanoid(8), label: `Case ${latest.length + 1}`, expression: '' }])
+          }}
         >
           <Plus className="h-3 w-3" />
           添加条件

@@ -49,6 +49,22 @@ describe('planAddAtFlowPosition', () => {
     if (!inside.ok) return
     expect(inside.node.parentId).toBe(box.id)
   })
+
+  it('honors an explicit null parentId even when the point sits inside a container', () => {
+    const box = createOperatorNode('foreach', { x: 0, y: 0 }, [start])
+    const result = planAddAtFlowPosition('agent', { x: 80, y: 80 }, [start, box], { parentId: null })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.node.parentId).toBeUndefined()
+  })
+
+  it('uses an explicit parentId without re-inferring a different container', () => {
+    const box = createOperatorNode('foreach', { x: 0, y: 0 }, [start])
+    const result = planAddAtFlowPosition('agent', { x: 80, y: 80 }, [start, box], { parentId: box.id })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.node.parentId).toBe(box.id)
+  })
 })
 
 describe('planAddAtViewportCenter', () => {

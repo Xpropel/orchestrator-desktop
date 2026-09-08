@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { FlowNode } from '@/core/types'
-import { dropLeavesContainer, isSourceOrAncestor, mergeNodeMetrics, pickDropTargetNode } from '../drop-target'
+import {
+  dropLeavesContainer,
+  isIgnoredConnectTarget,
+  isSourceOrAncestor,
+  mergeNodeMetrics,
+  pickDropTargetNode,
+  pointHitsNode
+} from '../drop-target'
 
 function node(id: string, extras?: Partial<FlowNode>): FlowNode {
   return {
@@ -96,6 +103,21 @@ describe('pickDropTargetNode', () => {
     it('never returns the source itself', () => {
       expect(pickDropTargetNode({ x: 30, y: 60 }, [box, loopStart, sibling, outside], 'loop:start')).toBeNull()
     })
+
+    it('does not treat loop-start as a connect target', () => {
+      expect(isIgnoredConnectTarget(loopStart)).toBe(true)
+      expect(pickDropTargetNode({ x: 30, y: 60 }, [box, loopStart, sibling, outside], 'sibling')).toBeNull()
+      expect(pickDropTargetNode({ x: 30, y: 60 }, [box, loopStart, sibling, outside], 'outside')?.id).toBe('loop')
+    })
+  })
+})
+
+describe('pointHitsNode', () => {
+  it('detects the source body so a click-release can cancel', () => {
+    const task = node('task', { position: { x: 100, y: 80 }, width: 240, height: 80 })
+    expect(pointHitsNode({ x: 160, y: 110 }, [task], 'task')).toBe(true)
+    expect(pointHitsNode({ x: 10, y: 10 }, [task], 'task')).toBe(false)
+    expect(pointHitsNode({ x: 160, y: 110 }, [task], 'missing')).toBe(false)
   })
 })
 

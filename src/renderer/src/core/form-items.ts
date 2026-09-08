@@ -1,16 +1,19 @@
-import { nanoid } from 'nanoid'
 import { isRecord, isVarType, type AssignmentItem, type CaseItem, type CategoryItem, type InputItem, type KeyValueItem, type VarType } from './schema'
+
+function stableId(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.length > 0 ? value : fallback
+}
 
 export function parseCases(value: unknown): CaseItem[] {
   if (!Array.isArray(value)) return []
   const cases: CaseItem[] = []
   for (const [index, item] of value.entries()) {
     if (!isRecord(item)) {
-      cases.push({ id: nanoid(8), label: `Case ${index + 1}`, expression: '' })
+      cases.push({ id: `case-${index}`, label: `Case ${index + 1}`, expression: '' })
       continue
     }
     cases.push({
-      id: typeof item.id === 'string' && item.id.length > 0 ? item.id : nanoid(8),
+      id: stableId(item.id, `case-${index}`),
       label: typeof item.label === 'string' ? item.label : `Case ${index + 1}`,
       expression: typeof item.expression === 'string' ? item.expression : ''
     })
@@ -23,11 +26,11 @@ export function parseCategories(value: unknown): CategoryItem[] {
   const categories: CategoryItem[] = []
   for (const [index, item] of value.entries()) {
     if (!isRecord(item)) {
-      categories.push({ id: nanoid(8), name: `Category ${index + 1}`, description: '' })
+      categories.push({ id: `category-${index}`, name: `Category ${index + 1}`, description: '' })
       continue
     }
     categories.push({
-      id: typeof item.id === 'string' && item.id.length > 0 ? item.id : nanoid(8),
+      id: stableId(item.id, `category-${index}`),
       name: typeof item.name === 'string' ? item.name : `Category ${index + 1}`,
       description: typeof item.description === 'string' ? item.description : ''
     })
@@ -38,11 +41,12 @@ export function parseCategories(value: unknown): CategoryItem[] {
 export function parseInputs(value: unknown): InputItem[] {
   if (!Array.isArray(value)) return []
   const inputs: InputItem[] = []
-  for (const item of value) {
+  for (const [index, item] of value.entries()) {
     if (!isRecord(item)) continue
     const key = typeof item.key === 'string' ? item.key : ''
     const type: VarType = isVarType(item.type) ? item.type : 'string'
     inputs.push({
+      id: stableId(item.id, `input-${index}`),
       key,
       type,
       required: item.required === true,
@@ -55,10 +59,10 @@ export function parseInputs(value: unknown): InputItem[] {
 export function parseAssignments(value: unknown): AssignmentItem[] {
   if (!Array.isArray(value)) return []
   const assignments: AssignmentItem[] = []
-  for (const item of value) {
+  for (const [index, item] of value.entries()) {
     if (!isRecord(item)) continue
     assignments.push({
-      id: typeof item.id === 'string' && item.id.length > 0 ? item.id : nanoid(8),
+      id: stableId(item.id, `assign-${index}`),
       variable: typeof item.variable === 'string' ? item.variable : '',
       value: typeof item.value === 'string' ? item.value : ''
     })
@@ -69,10 +73,10 @@ export function parseAssignments(value: unknown): AssignmentItem[] {
 export function parseKeyValueItems(value: unknown): KeyValueItem[] {
   if (Array.isArray(value)) {
     const items: KeyValueItem[] = []
-    for (const item of value) {
+    for (const [index, item] of value.entries()) {
       if (!isRecord(item)) continue
       items.push({
-        id: typeof item.id === 'string' && item.id.length > 0 ? item.id : nanoid(8),
+        id: stableId(item.id, `kv-${index}`),
         key: typeof item.key === 'string' ? item.key : '',
         value: typeof item.value === 'string' ? String(item.value) : item.value == null ? '' : String(item.value)
       })
@@ -81,7 +85,7 @@ export function parseKeyValueItems(value: unknown): KeyValueItem[] {
   }
   if (!isRecord(value)) return []
   return Object.entries(value).map(([key, entry]) => ({
-    id: key.length > 0 ? key : nanoid(8),
+    id: key.length > 0 ? key : 'kv-empty',
     key,
     value: typeof entry === 'string' ? entry : entry == null ? '' : String(entry)
   }))

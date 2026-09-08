@@ -1,7 +1,15 @@
+import { isEditableInputType, TEXT_INPUT_SELECTOR } from '@shared/text-input'
+
 export function isTextInputTarget(target: EventTarget | null): boolean {
-  if (typeof HTMLElement === 'undefined') return false
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
-  return target.isContentEditable
+  if (typeof Element === 'undefined') return false
+  const el =
+    target instanceof Element ? target : target instanceof Node ? target.parentElement : null
+  if (!el) return false
+  const match = el.closest(TEXT_INPUT_SELECTOR)
+  if (!match) return false
+  if (match.tagName === 'INPUT') {
+    const type = 'type' in match && typeof match.type === 'string' ? match.type : 'text'
+    return isEditableInputType(type)
+  }
+  return true
 }

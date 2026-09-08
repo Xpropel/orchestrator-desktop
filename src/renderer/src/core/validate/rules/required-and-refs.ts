@@ -5,12 +5,14 @@ import {
   collectFormReferences,
   getAvailableVariables,
   isTypeCompatible,
+  knownNodeNames,
+  lookupAvailableVariable,
   parseReferences,
   resolveAcceptTypes,
   type AvailableVariable
 } from '../../variables'
 import type { FlowIssue } from '../issue'
-import { isEmptyValue, isStartNodeName, lookupAvailable } from '../helpers'
+import { isEmptyValue, isStartNodeName } from '../helpers'
 import { ruleAgentNoModel } from './agent-no-model'
 import { ruleForkUnused } from './fork-unused'
 import { missingRequired } from './missing-required'
@@ -26,27 +28,31 @@ function referenceIssues(
   fieldKey: string,
   value: string,
   accept: ReturnType<typeof resolveAcceptTypes>,
-  available: AvailableVariable[]
+  available: AvailableVariable[],
+  reported: Set<string>,
+  knownNames: string[]
 ): FlowIssue[] {
   const issues: FlowIssue[] = []
-  const refs = parseReferences(value)
+  const refs = parseReferences(value, knownNames)
   for (const ref of refs) {
-    const found = lookupAvailable(available, ref.node, ref.variable)
+    const token = `${ref.node}.${ref.variable}`
+    const found = lookupAvailableVariable(available, ref.node, ref.variable)
     const isSessionField = fieldKey === 'session' || fieldKey === 'source' || accept.includes('session')
     if (!found) {
       const nodeAvailable = available.some((item) => item.nodeName === ref.node)
       const named = nodes.some((item) => item.data.name === ref.node)
       if (nodeAvailable) {
-        issues.push(unknownReference(node.id, `引用的变量不存在：${ref.node}.${ref.variable}`, fieldKey))
+        issues.push(unknownReference(node.id, `引用的变量不存在：${token}`, fieldKey))
       } else if (named && !isStartNodeName(ref.node, nodes) && isSessionField) {
         issues.push(sessionNotUpstream(node.id, fieldKey))
       } else if (named && !isStartNodeName(ref.node, nodes)) {
-        issues.push(referenceNotUpstream(node.id, `${ref.node}.${ref.variable}`, fieldKey))
+        issues.push(referenceNotUpstream(node.id, token, fieldKey))
       } else if (ref.node !== 'sys' && !isStartNodeName(ref.node, nodes)) {
         issues.push(unknownReference(node.id, `引用的节点不存在：${ref.node}`, fieldKey))
       } else {
-        issues.push(unknownReference(node.id, `引用的变量不存在：${ref.node}.${ref.variable}`, fieldKey))
+        issues.push(unknownReference(node.id, `引用的变量不存在：${token}`, fieldKey))
       }
+      reported.add(token)
       continue
     }
     if (accept.length > 0 && !isTypeCompatible(found.variable.type, accept)) {
@@ -55,6 +61,7 @@ function referenceIssues(
       } else {
         issues.push(typeMismatch(node.id, fieldKey, found.variable.type, accept))
       }
+      reported.add(token)
     }
   }
   return issues
@@ -68,31 +75,36 @@ export function ruleRequiredAndRefs(
 ): FlowIssue[] {
   const issues: FlowIssue[] = []
   const available = getAvailableVariables(node.id, nodes, edges)
+  const knownNames = knownNodeNames(nodes)
   const availableNames = new Set(available.map((item) => `${item.nodeName}.${item.variable.name}`))
+  const reported = new Set<string>()
+  const visibleForm: Record<string, unknown> = {}
 
   for (const field of operator.params) {
     if (field.showWhen && !fieldVisible(node.data.form, field)) {
       continue
     }
+    if (Object.prototype.hasOwnProperty.call(node.data.form, field.key)) {
+      visibleForm[field.key] = node.data.form[field.key]
+    }
     const value = node.data.form[field.key]
-    if (field.required && isEmptyValue(value)) {
+    const dedicatedWhileCondition = operator.type === 'while' && field.key === 'condition'
+    if (field.required && isEmptyValue(value) && !dedicatedWhileCondition) {
       issues.push(missingRequired(node.id, field.key, field.label))
     }
 
     if (field.type === 'variable' && typeof value === 'string' && value.trim().length > 0) {
       const accept = resolveAcceptTypes(field.extra)
-      issues.push(...referenceIssues(node, nodes, field.key, value, accept, available))
+      issues.push(...referenceIssues(node, nodes, field.key, value, accept, available, reported, knownNames))
     }
   }
 
   issues.push(...ruleAgentNoModel(node, operator))
 
-  const refs = collectFormReferences(node.data.form)
+  const refs = collectFormReferences(visibleForm, knownNames)
   for (const ref of refs) {
-    if (availableNames.has(`${ref.node}.${ref.variable}`)) continue
     const token = `${ref.node}.${ref.variable}`
-    const already = issues.some((item) => item.nodeId === node.id && item.message.includes(token))
-    if (already) continue
+    if (availableNames.has(token) || reported.has(token)) continue
     const named = nodes.find((item) => item.data.name === ref.node)
     if (named && !isStartNodeName(ref.node, nodes)) {
       issues.push(referenceNotUpstream(node.id, token))
@@ -101,6 +113,7 @@ export function ruleRequiredAndRefs(
     } else {
       issues.push(unknownReference(node.id, `引用的变量不存在：${token}`))
     }
+    reported.add(token)
   }
 
   issues.push(...ruleForkUnused(node, operator, nodes))

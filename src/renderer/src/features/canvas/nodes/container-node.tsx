@@ -1,12 +1,14 @@
 import { memo, useState, type JSX } from 'react'
 import { NodeResizer, Position, type NodeProps } from '@xyflow/react'
+import { useShallow } from 'zustand/react/shallow'
 import { cn } from '@/ui/cn'
-import { CONTAINER_MIN_HEIGHT, CONTAINER_MIN_WIDTH } from '@/core/graph'
+import { CONTAINER_MIN_HEIGHT, CONTAINER_MIN_WIDTH, minContainerSizeForChildren } from '@/core/graph'
 import { resolveIcon } from '@/ui/icons'
 import { getOperator, hasOperator } from '@/core/registry'
 import type { CanvasNode } from '@/features/canvas/flow-types'
 import { FlowHandle } from './flow-handle'
 import { OrderedSourcePorts, orderedPortsMinHeight, useStartOutgoingCount } from './ordered-source-ports'
+import { useFlowStore } from '@/state/flow-store'
 import { NodeHoverToolbar } from './node-hover-toolbar'
 import { NodeIssueBadge } from './node-issue-badge'
 
@@ -20,22 +22,25 @@ export const ContainerNode = memo(function ContainerNode({
   const Icon = resolveIcon(def?.icon ?? 'Repeat')
   const color = data.color ?? def?.color ?? '#f59e0b'
   const occupied = useStartOutgoingCount(id)
+  const childMin = useFlowStore(useShallow((state) => minContainerSizeForChildren(id, state.nodes)))
+  const minWidth = Math.max(CONTAINER_MIN_WIDTH, childMin.width)
+  const minHeight = Math.max(CONTAINER_MIN_HEIGHT, childMin.height, orderedPortsMinHeight(occupied))
 
   return (
     <div
       data-testid={`node-container-${data.label}`}
       className={cn(
-        'orchestrator-card relative h-full min-h-[220px] min-w-[360px] w-full rounded-lg border border-border bg-elevated/80 shadow-sm',
+        'orchestrator-card relative h-full w-full rounded-lg border border-border bg-elevated/80 shadow-sm',
         selected && 'orchestrator-card-selected'
       )}
-      style={{ minHeight: Math.max(CONTAINER_MIN_HEIGHT, orderedPortsMinHeight(occupied)) }}
+      style={{ minWidth, minHeight }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <NodeResizer
         isVisible={selected}
-        minWidth={CONTAINER_MIN_WIDTH}
-        minHeight={CONTAINER_MIN_HEIGHT}
+        minWidth={minWidth}
+        minHeight={minHeight}
         color="var(--accent)"
       />
       <NodeIssueBadge nodeId={id} />

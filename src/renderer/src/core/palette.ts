@@ -1,4 +1,4 @@
-import { listCategories, listOperators, listOperatorsByCategory } from '@/core/registry'
+import { getCategory, listCategories, listOperators, listOperatorsByCategory } from '@/core/registry'
 import type { OperatorCategory, OperatorDefinition } from '@/core/schema'
 import type { FlowNode } from '@/core/types'
 
@@ -56,9 +56,14 @@ export function sortCategoriesForSidebar(categories = listCategories()): Operato
 export function operatorMatchesQuery(operator: OperatorDefinition, query: string): boolean {
   const needle = query.trim().toLowerCase()
   if (!needle) return true
-  return (
+  if (
     operator.title.toLowerCase().includes(needle) ||
     operator.description.toLowerCase().includes(needle) ||
-    operator.type.toLowerCase().includes(needle)
-  )
+    operator.type.toLowerCase().includes(needle) ||
+    operator.category.toLowerCase().includes(needle)
+  ) {
+    return true
+  }
+  const category = getCategory(operator.category)
+  return (category?.title ?? '').toLowerCase().includes(needle)
 }

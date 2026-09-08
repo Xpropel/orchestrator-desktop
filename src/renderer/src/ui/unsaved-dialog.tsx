@@ -18,8 +18,20 @@ function emit(state: DialogState): void {
   }
 }
 
+export function cancelOpenUnsavedDialog(): void {
+  if (!current) {
+    return
+  }
+  const { resolve } = current
+  emit(null)
+  resolve('cancel')
+}
+
 export function showUnsavedDialog(message?: string): Promise<UnsavedChoice> {
   return new Promise((resolve) => {
+    if (current) {
+      current.resolve('cancel')
+    }
     emit({
       message: message ?? '当前流程有未保存的更改，是否保存？',
       resolve
@@ -37,6 +49,22 @@ export function UnsavedDialogHost(): JSX.Element | null {
     }
   }, [])
 
+  useEffect(() => {
+    if (!state) {
+      return
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        const { resolve } = state
+        emit(null)
+        resolve('cancel')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [state])
+
   if (!state) {
     return null
   }
@@ -48,7 +76,14 @@ export function UnsavedDialogHost(): JSX.Element | null {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50">
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) {
+          choose('cancel')
+        }
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"

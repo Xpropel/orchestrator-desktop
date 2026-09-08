@@ -67,6 +67,11 @@ body,
   fill: rgba(13, 17, 23, 0.72);
 }
 
+/* 端口挂在卡片外侧；节点包装器若 overflow:hidden 会裁掉 handle / + 号。 */
+.react-flow__node {
+  overflow: visible;
+}
+
 .react-flow__handle.orchestrator-handle {
   width: 12px;
   height: 12px;
@@ -179,4 +184,9 @@ body,
   height: 8px;
   border-color: var(--accent);
   background: var(--bg-panel);
+}
+
+/* 透明工具栏叠在点阵上时，用底色渐变保住浅色主题对比度。 */
+.orch-top-toolbar {
+  background: linear-gradient(to bottom, var(--bg-base) 72%, transparent);
 }

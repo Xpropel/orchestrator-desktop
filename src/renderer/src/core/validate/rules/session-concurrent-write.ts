@@ -1,11 +1,13 @@
 import { getSourceHandles } from '../../registry'
 import type { FlowEdge, FlowNode } from '../../types'
+import { knownNodeNames } from '../../variables'
 import { issue, type FlowIssue } from '../issue'
 import { descendantsFromHandle, operatorOf, sessionRefKey } from '../helpers'
 
 export function ruleSessionConcurrentWrite(nodes: FlowNode[], edges: FlowEdge[]): FlowIssue[] {
   const issues: FlowIssue[] = []
   const nodeMap = new Map(nodes.map((node) => [node.id, node]))
+  const knownNames = knownNodeNames(nodes)
   const branchNodes = nodes.filter((node) => operatorOf(node)?.kind === 'branch')
   for (const branch of branchNodes) {
     const handles = getSourceHandles(branch.data.label, branch.data.form)
@@ -15,7 +17,7 @@ export function ruleSessionConcurrentWrite(nodes: FlowNode[], edges: FlowEdge[])
       for (const id of down) {
         const node = nodeMap.get(id)
         if (!node || operatorOf(node)?.type !== 'agent') continue
-        const key = sessionRefKey(node.data.form.session)
+        const key = sessionRefKey(node.data.form.session, knownNames)
         if (!key) continue
         writers.push({ nodeId: node.id, session: key, handle: handle.id })
       }

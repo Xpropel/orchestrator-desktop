@@ -4,7 +4,7 @@ import { getNodeSummary } from '@/core/graph'
 import { getNodeOutputs } from '@/core/variables'
 import type { CanvasNode } from '@/features/canvas/flow-types'
 import { FlowHandle } from './flow-handle'
-import { NodeChrome } from './node-chrome'
+import { CARD_MIN_HEIGHT, NodeChrome } from './node-chrome'
 import { OrderedSourcePorts, orderedPortsMinHeight, useStartOutgoingCount } from './ordered-source-ports'
 
 export const TaskNode = memo(function TaskNode({
@@ -26,7 +26,14 @@ export const TaskNode = memo(function TaskNode({
       style={{ minHeight: orderedPortsMinHeight(occupied) }}
     >
       <FlowHandle type="target" id="end" position={Position.Left} />
-      <NodeChrome id={id} data={data} selected={selected} width={width} height={height}>
+      <NodeChrome
+        id={id}
+        data={data}
+        selected={selected}
+        width={width}
+        height={height}
+        minHeight={Math.max(CARD_MIN_HEIGHT, orderedPortsMinHeight(occupied))}
+      >
         {summary ? (
           <div className="border-t border-border px-3 py-1.5 text-[11px] text-secondary">
             <span className="line-clamp-2">{summary}</span>

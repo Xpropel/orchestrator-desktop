@@ -135,7 +135,10 @@ function followSession(
   if (hops > HOP_LIMIT) return null
   const binding = sessionBindingOf(from)
   if (!binding) return null
-  const ref = parseReferences(binding)[0]
+  const ref = parseReferences(
+    binding,
+    nodes.map((item) => item.data.name)
+  )[0]
   const target = ref ? findNodeByRef(nodes, ref.node) : undefined
   if (!target) return null
   return applyRules(target, nodes, hops, seen)

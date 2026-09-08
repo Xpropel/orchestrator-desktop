@@ -6,6 +6,7 @@ icon: build/icon.png
 files:
   - out/**/*
   - examples/**/*
+  - '!examples/private/**'
   - package.json
 asar: true
 win:

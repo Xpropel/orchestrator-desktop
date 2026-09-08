@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import {
   BaseEdge,
@@ -29,6 +29,14 @@ export const ButtonEdge = memo(function ButtonEdge({
   const [hovered, setHovered] = useState(false)
   const { zoom } = useViewport()
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current !== undefined) {
+        clearTimeout(hideTimer.current)
+      }
+    }
+  }, [])
   // 与 RAGFlow 编排画布一致：平滑贝塞尔曲线，而不是折线。
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

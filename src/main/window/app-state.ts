@@ -1,3 +1,7 @@
+import { APP_TITLE, formatWindowTitle } from '../../shared/window-title'
+
+export { APP_TITLE }
+
 export const appState = {
   dirty: false,
   ignoreCloseGuard: false,
@@ -5,10 +9,7 @@ export const appState = {
   documentTitle: ''
 }
 
-export const APP_TITLE = 'Orchestrator Desktop'
-
 /** 窗口标题：`流程标题 * — Orchestrator Desktop`。 */
 export function windowTitle(): string {
-  const marker = appState.dirty ? ' *' : ''
-  return appState.documentTitle ? `${appState.documentTitle}${marker} — ${APP_TITLE}` : `${APP_TITLE}${marker}`
+  return formatWindowTitle(appState.documentTitle, appState.dirty)
 }

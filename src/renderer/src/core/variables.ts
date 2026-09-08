@@ -5,7 +5,7 @@ import { getOperator, hasOperator } from './registry'
 import { isVarType, type VariableDef, type VarType } from './schema'
 import type { FlowEdge, FlowNode } from './types'
 
-interface VariableRef {
+export interface VariableRef {
   raw: string
   node: string
   variable: string
@@ -28,23 +28,65 @@ const SYS_VARIABLES: VariableDef[] = [
   { name: 'now', type: 'string', description: '当前时间' }
 ]
 
-export function parseReferences(text: string): VariableRef[] {
+/** 名称含 `.` `{` `}`，或首尾/全是空白时，不能作为 `{{name.var}}` 的节点名。 */
+export function invalidNodeNameReason(name: string): string | undefined {
+  if (name.trim().length === 0) return '名称不能为空'
+  if (name !== name.trim()) return '名称两端不能有空格'
+  if (name.includes('.') || name.includes('{') || name.includes('}')) return '名称不能包含 . { }'
+  return undefined
+}
+
+export function knownNodeNames(nodes: Iterable<{ data: { name: string } }>, extra: Iterable<string> = []): string[] {
+  const names = new Set<string>(['sys', ...extra])
+  for (const node of nodes) {
+    if (node.data.name) names.add(node.data.name)
+  }
+  return [...names]
+}
+
+/** 有已知节点名时取最长前缀；否则按第一个 `.` 切开（无节点列表的纯解析）。 */
+export function splitReferenceBody(
+  inner: string,
+  knownNames?: Iterable<string>
+): { node: string; variable: string } | null {
+  const body = inner.trim()
+  if (!body) return null
+  if (knownNames) {
+    let best: { node: string; variable: string } | null = null
+    for (const name of knownNames) {
+      if (!name || !body.startsWith(name)) continue
+      const rest = body.slice(name.length).match(/^\s*\.\s*(.+)$/)
+      const variable = rest?.[1]?.trim() ?? ''
+      if (!variable) continue
+      if (!best || name.length > best.node.length) {
+        best = { node: name, variable }
+      }
+    }
+    if (best) return best
+  }
+  const dot = body.indexOf('.')
+  if (dot <= 0 || dot === body.length - 1) return null
+  const node = body.slice(0, dot).trim()
+  const variable = body.slice(dot + 1).trim()
+  if (!node || !variable) return null
+  return { node, variable }
+}
+
+export function parseReferences(text: string, knownNames?: Iterable<string>): VariableRef[] {
   const refs: VariableRef[] = []
   const seen = new Set<string>()
+  const names = knownNames ? knownNodeNames([], knownNames) : undefined
   REF_RE.lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = REF_RE.exec(text)) !== null) {
     const inner = match[1]?.trim() ?? ''
-    const dot = inner.indexOf('.')
-    if (dot <= 0 || dot === inner.length - 1) continue
-    const node = inner.slice(0, dot).trim()
-    const variable = inner.slice(dot + 1).trim()
-    if (!node || !variable) continue
+    const split = splitReferenceBody(inner, names)
+    if (!split) continue
     const raw = match[0]
-    const key = `${raw}\0${node}\0${variable}`
+    const key = `${raw}\0${split.node}\0${split.variable}`
     if (seen.has(key)) continue
     seen.add(key)
-    refs.push({ raw, node, variable })
+    refs.push({ raw, node: split.node, variable: split.variable })
   }
   return refs
 }
@@ -68,13 +110,16 @@ export function getNodeOutputs(node: Pick<FlowNode, 'data'>): VariableDef[] {
   const operator = getOperator(node.data.label)
   const fromParam = operator.constraints?.outputsFromParam
   if (!fromParam) return operator.outputs
-  const derived = parseInputs(node.data.form[fromParam])
-    .filter((item) => item.key)
-    .map((item) => ({
+  const derivedByName = new Map<string, VariableDef>()
+  for (const item of parseInputs(node.data.form[fromParam])) {
+    if (!item.key) continue
+    derivedByName.set(item.key, {
       name: item.key,
       type: item.type,
       description: item.description
-    }))
+    })
+  }
+  const derived = [...derivedByName.values()]
   const derivedNames = new Set(derived.map((item) => item.name))
   return [...operator.outputs.filter((item) => !derivedNames.has(item.name)), ...derived]
 }
@@ -97,7 +142,7 @@ function collectContainerChain(nodeId: string, nodes: FlowNode[]): FlowNode[] {
 }
 
 function pushUnique(bag: AvailableVariable[], seen: Set<string>, item: AvailableVariable): void {
-  const key = `${item.scope}:${item.nodeName}.${item.variable.name}`
+  const key = `${item.nodeId}\0${item.variable.name}`
   if (seen.has(key)) return
   seen.add(key)
   bag.push(item)
@@ -184,41 +229,55 @@ export function getAvailableVariables(
   return result
 }
 
+/** 用可用变量表里的节点名做最长前缀匹配（兼容历史文档里带 `.` 的节点名）。 */
+export function lookupAvailableVariable<T extends { nodeName: string; variable: { name: string } }>(
+  available: readonly T[],
+  nodeOrBody: string,
+  variable?: string
+): T | undefined {
+  const names = available.map((item) => item.nodeName)
+  const body = variable === undefined ? nodeOrBody : `${nodeOrBody}.${variable}`
+  const split = splitReferenceBody(body, names)
+  if (!split) return undefined
+  return available.find((item) => item.nodeName === split.node && item.variable.name === split.variable)
+}
+
 export function isTypeCompatible(actual: VarType, accept: VarType[]): boolean {
   if (accept.length === 0) return true
   if (actual === 'any' || accept.includes('any')) return true
   return accept.includes(actual)
 }
 
-function renameInText(text: string, oldName: string, newName: string): string {
+function renameInText(text: string, oldName: string, newName: string, knownNames?: Iterable<string>): string {
   if (oldName === newName || oldName.length === 0) return text
-  const pattern = new RegExp(`\\{\\{\\s*${escapeRegExp(oldName)}\\.`, 'g')
-  return text.replace(pattern, `{{${newName}.`)
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const names = knownNames ? knownNodeNames([], [...knownNames, oldName]) : [oldName, 'sys']
+  return text.replace(REF_RE, (raw, inner: string) => {
+    const split = splitReferenceBody(inner ?? '', names)
+    if (!split || split.node !== oldName) return raw
+    return `{{${newName}.${split.variable}}}`
+  })
 }
 
 export function renameReferencesInForm(
   form: Record<string, unknown>,
   oldName: string,
-  newName: string
+  newName: string,
+  knownNames?: Iterable<string>
 ): Record<string, unknown> {
-  return walkRename(form, oldName, newName) as Record<string, unknown>
+  return walkRename(form, oldName, newName, knownNames) as Record<string, unknown>
 }
 
-function walkRename(value: unknown, oldName: string, newName: string): unknown {
+function walkRename(value: unknown, oldName: string, newName: string, knownNames?: Iterable<string>): unknown {
   if (typeof value === 'string') {
-    return renameInText(value, oldName, newName)
+    return renameInText(value, oldName, newName, knownNames)
   }
   if (Array.isArray(value)) {
-    return value.map((item) => walkRename(item, oldName, newName))
+    return value.map((item) => walkRename(item, oldName, newName, knownNames))
   }
   if (value && typeof value === 'object') {
     const next: Record<string, unknown> = {}
     for (const [key, entry] of Object.entries(value)) {
-      next[key] = walkRename(entry, oldName, newName)
+      next[key] = walkRename(entry, oldName, newName, knownNames)
     }
     return next
   }
@@ -226,21 +285,26 @@ function walkRename(value: unknown, oldName: string, newName: string): unknown {
 }
 
 export function renameReferencesInGraph(nodes: FlowNode[], oldName: string, newName: string): FlowNode[] {
+  const known = knownNodeNames(nodes, [oldName, newName])
   return nodes.map((node) => ({
     ...node,
     data: {
       ...node.data,
-      form: renameReferencesInForm(node.data.form, oldName, newName)
+      description:
+        typeof node.data.description === 'string'
+          ? renameInText(node.data.description, oldName, newName, known)
+          : node.data.description,
+      form: renameReferencesInForm(node.data.form, oldName, newName, known)
     }
   }))
 }
 
-export function collectFormReferences(form: unknown): VariableRef[] {
+export function collectFormReferences(form: unknown, knownNames?: Iterable<string>): VariableRef[] {
   const refs: VariableRef[] = []
   const seen = new Set<string>()
   const visit = (value: unknown): void => {
     if (typeof value === 'string') {
-      for (const ref of parseReferences(value)) {
+      for (const ref of parseReferences(value, knownNames)) {
         const key = `${ref.node}.${ref.variable}`
         if (seen.has(key)) continue
         seen.add(key)

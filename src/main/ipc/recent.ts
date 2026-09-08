@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { allowPath } from '../security/allowed-paths'
 import { normalizePath } from '../security/normalize-path'
 
-const MAX_RECENT = 8
+export const MAX_RECENT = 8
 
 function recentFilePath(): string {
   return join(app.getPath('userData'), 'recent.json')
@@ -21,10 +21,23 @@ export function getRecentFiles(): string[] {
     if (!Array.isArray(parsed)) {
       return []
     }
-    return parsed
-      .filter((item): item is string => typeof item === 'string')
-      .filter((item) => isFlowFile(item) && existsSync(item))
-      .slice(0, MAX_RECENT)
+    const seen = new Set<string>()
+    const next: string[] = []
+    for (const item of parsed) {
+      if (typeof item !== 'string' || !isFlowFile(item) || !existsSync(item)) {
+        continue
+      }
+      const key = normalizePath(item)
+      if (seen.has(key)) {
+        continue
+      }
+      seen.add(key)
+      next.push(item)
+      if (next.length >= MAX_RECENT) {
+        break
+      }
+    }
+    return next
   } catch {
     return []
   }
@@ -32,12 +45,16 @@ export function getRecentFiles(): string[] {
 
 export function addRecentFile(filePath: string): void {
   allowPath(filePath)
-  const normalized = normalizePath(filePath)
-  const next = [filePath, ...getRecentFiles().filter((item) => normalizePath(item) !== normalized)].slice(
-    0,
-    MAX_RECENT
-  )
-  writeFileSync(recentFilePath(), JSON.stringify(next, null, 2), 'utf8')
+  try {
+    const normalized = normalizePath(filePath)
+    const next = [filePath, ...getRecentFiles().filter((item) => normalizePath(item) !== normalized)].slice(
+      0,
+      MAX_RECENT
+    )
+    writeFileSync(recentFilePath(), JSON.stringify(next, null, 2), 'utf8')
+  } catch {
+    // 最近列表写失败不能让已经成功的打开/保存 IPC 失败。
+  }
 }
 
 export function seedAllowedPaths(paths: string[]): void {

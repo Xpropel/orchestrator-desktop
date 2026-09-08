@@ -1,4 +1,4 @@
-import { getNodeAbsoluteBox, pointInBox } from '@/core/graph'
+import { getNodeAbsoluteBox, isLoopStartNode, pointInBox } from '@/core/graph'
 import { getKindForNodeType, getOperator, hasOperator } from '@/core/registry'
 import type { FlowNode, XYPosition } from '@/core/types'
 
@@ -6,6 +6,17 @@ function isNoteNode(node: FlowNode): boolean {
   if (node.type === 'noteNode') return true
   if (hasOperator(node.data.label) && getOperator(node.data.label).kind === 'note') return true
   return getKindForNodeType(node.type) === 'note'
+}
+
+/** 便签没有连线；loop-start 只有出口，不能当落点。 */
+export function isIgnoredConnectTarget(node: FlowNode): boolean {
+  return isNoteNode(node) || isLoopStartNode(node)
+}
+
+export function pointHitsNode(point: XYPosition, nodes: FlowNode[], nodeId: string): boolean {
+  const node = nodes.find((item) => item.id === nodeId)
+  if (!node) return false
+  return pointInBox(point, getNodeAbsoluteBox(node, nodes))
 }
 
 function parentDepth(node: FlowNode, byId: Map<string, FlowNode>): number {
@@ -71,7 +82,7 @@ export function pickDropTargetNode(point: XYPosition, nodes: FlowNode[], sourceI
   const hits: { node: FlowNode; index: number; depth: number }[] = []
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index]
-    if (!node || isNoteNode(node) || excluded.has(node.id)) continue
+    if (!node || isIgnoredConnectTarget(node) || excluded.has(node.id)) continue
     if (!pointInBox(point, getNodeAbsoluteBox(node, nodes))) continue
     hits.push({ node, index, depth: parentDepth(node, byId) })
   }

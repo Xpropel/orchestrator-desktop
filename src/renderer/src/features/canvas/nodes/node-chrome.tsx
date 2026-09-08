@@ -13,7 +13,15 @@ import { NodeIssueBadge } from './node-issue-badge'
 
 export const CARD_DEFAULT_WIDTH = 240
 export const CARD_MIN_WIDTH = 200
-export const CARD_MIN_HEIGHT = 60
+/** 色条 + 标题两行；再矮会裁掉型号行或出口第一行。 */
+export const CARD_MIN_HEIGHT = 80
+/** 色条 h-1 + 标题 py-2/两行文本，与 BranchNode 出口 top 对齐。 */
+export const CARD_CHROME_HEADER_PX = 52
+export const CARD_MODEL_BADGE_PX = 22
+
+export function cardChromeHeaderPx(hasModelBadge: boolean): number {
+  return CARD_CHROME_HEADER_PX + (hasModelBadge ? CARD_MODEL_BADGE_PX : 0)
+}
 
 export const NodeChrome = memo(function NodeChrome({
   id,
@@ -21,6 +29,8 @@ export const NodeChrome = memo(function NodeChrome({
   data,
   width,
   height,
+  minWidth = CARD_MIN_WIDTH,
+  minHeight = CARD_MIN_HEIGHT,
   showDelete = true,
   showCopy = true,
   children
@@ -31,6 +41,8 @@ export const NodeChrome = memo(function NodeChrome({
   /** 节点的显式尺寸（用户拉伸过才有），来自 NodeProps */
   width?: number
   height?: number
+  minWidth?: number
+  minHeight?: number
   showDelete?: boolean
   showCopy?: boolean
   children?: ReactNode
@@ -50,11 +62,15 @@ export const NodeChrome = memo(function NodeChrome({
         'orchestrator-card relative flex flex-col rounded-lg border border-border bg-elevated shadow-sm',
         selected && 'orchestrator-card-selected'
       )}
-      style={{ ...cardBoxStyle(width, height, CARD_DEFAULT_WIDTH), minWidth: CARD_MIN_WIDTH }}
+      style={{
+        ...cardBoxStyle(width, height, CARD_DEFAULT_WIDTH),
+        minWidth,
+        ...(height == null ? { minHeight } : {})
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <CardResizer selected={selected} minWidth={CARD_MIN_WIDTH} minHeight={CARD_MIN_HEIGHT} />
+      <CardResizer selected={selected} minWidth={minWidth} minHeight={minHeight} />
       <NodeIssueBadge nodeId={id} />
       <NodeHoverToolbar
         nodeId={id}
@@ -87,7 +103,7 @@ export const NodeChrome = memo(function NodeChrome({
           </span>
         </div>
       ) : null}
-      {children}
+      {children ? <div className="min-h-0 min-w-0 overflow-hidden">{children}</div> : null}
     </div>
   )
 })

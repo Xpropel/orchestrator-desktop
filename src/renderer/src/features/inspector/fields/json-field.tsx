@@ -34,6 +34,15 @@ export function JsonField({
   }, [snapshot, nodeId, revision])
 
   const commit = (raw: string): void => {
+    if (raw.trim() === '') {
+      setInvalid(false)
+      if (replaceForm && onReplaceForm) {
+        onReplaceForm({})
+        return
+      }
+      onChange(undefined)
+      return
+    }
     try {
       const parsed: unknown = JSON.parse(raw)
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

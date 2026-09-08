@@ -1,8 +1,10 @@
 import { downloadText, fileApi } from '@/platform/platform'
 import { documentToGraph, graphToDocument, parseDocument, serializeDocument } from '@/core/dsl'
+import { snapshotOf, titleFromPath } from '@/state/flow-helpers'
 import { useFlowStore } from '@/state/flow-store'
 import { useUiStore } from '@/state/ui-store'
-import { normalizeImportedJson } from './import-json'
+import { clearRecoverySnapshot } from './crash-recovery'
+import { normalizeImportedJson, titleFromFileName } from './import-json'
 
 const PATH_NOT_ALLOWED = 'PATH_NOT_ALLOWED'
 
@@ -16,12 +18,14 @@ export function serializeCurrentFlow(): string {
  * 解析 JSON 文本并载入画布。`filePath` 为 null 表示来源不是磁盘文件（示例、恢复）。
  * 之后「保存」会退化为「另存为」。解析失败抛出 Error。 */
 export function loadFlowFromText(content: string, filePath: string | null): void {
-  const doc = parseDocument(content)
+  const fallbackTitle = filePath ? titleFromPath(filePath) : titleFromFileName('untitled.json')
+  const doc = parseDocument(content, { fallbackTitle })
   const graph = documentToGraph(doc)
+  const title = graph.title.trim().length > 0 ? graph.title : fallbackTitle
   useFlowStore.getState().loadDocument(
     {
       ...doc,
-      title: graph.title,
+      title,
       graph: { nodes: graph.nodes, edges: graph.edges },
       globals: doc.globals ?? {}
     },
@@ -29,6 +33,15 @@ export function loadFlowFromText(content: string, filePath: string | null): void
   )
   // 换了文档，属性面板不能继续指着旧节点（哪怕新文档恰好有同名 id）。
   useUiStore.getState().closeInspector()
+}
+
+function captureSavePayload(): { content: string; written: ReturnType<typeof snapshotOf> } {
+  const { nodes, edges, title, globals } = useFlowStore.getState()
+  const written = snapshotOf(nodes, edges, title, globals)
+  return {
+    content: serializeDocument(graphToDocument(written.nodes, written.edges, written.title, written.globals)),
+    written
+  }
 }
 
 function report(result: 'saved' | 'cancelled' | 'failed'): void {
@@ -55,6 +68,7 @@ export async function newFlow(): Promise<void> {
   }
   useFlowStore.getState().resetToEmpty()
   useUiStore.getState().closeInspector()
+  void clearRecoverySnapshot()
 }
 
 export async function openFlow(filePath?: string): Promise<void> {
@@ -84,6 +98,7 @@ export async function openFlow(filePath?: string): Promise<void> {
 
   try {
     loadFlowFromText(result.content, result.filePath)
+    void clearRecoverySnapshot()
   } catch (error) {
     const message = error instanceof Error ? error.message : '无法解析该文件'
     window.alert(message)
@@ -111,22 +126,21 @@ const publicManifestModules = import.meta.glob('@examples/index.json', {
   import: 'default'
 }) as Record<string, unknown>
 
-const privateManifestModules = import.meta.glob('@examples/private/index.json', {
-  eager: true,
-  import: 'default'
-}) as Record<string, unknown>
-
 const publicFlowModules = import.meta.glob('@examples/*.flow.json', {
   eager: true,
   import: 'default'
 }) as Record<string, unknown>
 
-const privateFlowModules = import.meta.glob('@examples/private/*.flow.json', {
-  eager: true,
-  import: 'default'
-}) as Record<string, unknown>
-
-const exampleFlowModules = { ...publicFlowModules, ...privateFlowModules }
+async function loadPrivateExampleModules(): Promise<{
+  manifest: Record<string, unknown>
+  flows: Record<string, unknown>
+}> {
+  if (!import.meta.env.DEV) {
+    return { manifest: {}, flows: {} }
+  }
+  const mod = await import('./example-modules.private')
+  return { manifest: mod.privateManifestModules, flows: mod.privateFlowModules }
+}
 
 if (import.meta.env.DEV && Object.keys(publicManifestModules).length === 0) {
   console.error('[examples] 未找到 examples/index.json，请检查 @examples 别名与目录')
@@ -149,23 +163,26 @@ function entriesOf(raw: unknown): ExampleManifestEntry[] {
   return Array.isArray(raw) ? raw.filter(isManifestEntry) : []
 }
 
-function readExampleManifest(): ExampleManifestEntry[] {
+async function readExampleManifest(): Promise<ExampleManifestEntry[]> {
   const publicEntries = entriesOf(Object.values(publicManifestModules)[0])
-  const privateEntries = entriesOf(Object.values(privateManifestModules)[0])
+  const { manifest } = await loadPrivateExampleModules()
+  const privateEntries = entriesOf(Object.values(manifest)[0])
   return [...publicEntries, ...privateEntries]
 }
 
 export async function listExampleFlows(): Promise<ExampleFlow[]> {
-  return readExampleManifest().map(({ name, title, description }) => ({ name, title, description }))
+  return (await readExampleManifest()).map(({ name, title, description }) => ({ name, title, description }))
 }
 
 /** 载入内置示例；返回是否成功（用户取消或示例缺失返回 false）。 */
 export async function openExampleFlow(name: string): Promise<boolean> {
-  const entry = readExampleManifest().find((item) => item.name === name)
+  const entry = (await readExampleManifest()).find((item) => item.name === name)
   if (!entry) {
     window.alert(`示例不存在：${name}`)
     return false
   }
+  const { flows } = await loadPrivateExampleModules()
+  const exampleFlowModules = { ...publicFlowModules, ...flows }
   const key = Object.keys(exampleFlowModules).find((path) => path.endsWith(`/${entry.file}`))
   const content = key ? exampleFlowModules[key] : undefined
   if (content === undefined) {
@@ -177,6 +194,7 @@ export async function openExampleFlow(name: string): Promise<boolean> {
   }
   try {
     loadFlowFromText(JSON.stringify(content), null)
+    void clearRecoverySnapshot()
     return true
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '示例文件无法解析')
@@ -194,8 +212,9 @@ export async function saveFlow(options?: { silent?: boolean }): Promise<boolean>
   }
 
   try {
-    await fileApi.saveFlow(filePath, serializeCurrentFlow())
-    useFlowStore.getState().markSaved(filePath)
+    const { content, written } = captureSavePayload()
+    await fileApi.saveFlow(filePath, content)
+    useFlowStore.getState().markSaved(filePath, written)
     report('saved')
     return true
   } catch (error) {
@@ -218,12 +237,13 @@ export async function saveFlowAs(): Promise<boolean> {
   const defaultName = (filePath?.split(/[/\\]/).pop() ?? `${title}.flow.json`) || 'untitled.flow.json'
 
   try {
-    const nextPath = await fileApi.saveFlowAs(serializeCurrentFlow(), defaultName)
+    const { content, written } = captureSavePayload()
+    const nextPath = await fileApi.saveFlowAs(content, defaultName)
     if (!nextPath) {
       report('cancelled')
       return false
     }
-    useFlowStore.getState().markSaved(nextPath)
+    useFlowStore.getState().markSaved(nextPath, written)
     report('saved')
     return true
   } catch (error) {
@@ -278,9 +298,12 @@ function applyImportedJson(text: string, fileName: string, filePath: string | nu
       loadFlowFromText(normalized.content, filePath)
     } else {
       loadFlowFromText(normalized.content, null)
-      useFlowStore.getState().setTitle(normalized.title)
+      if (useFlowStore.getState().title !== normalized.title) {
+        useFlowStore.getState().setTitle(normalized.title)
+      }
       useFlowStore.getState().markUnsaved()
     }
+    void clearRecoverySnapshot()
 
     const { nodes, edges } = useFlowStore.getState()
     let message = `已导入「${normalized.title}」：${nodes.length} 个节点、${edges.length} 条边`

@@ -1,4 +1,15 @@
+import { formatWindowTitle } from '@shared/window-title'
 import type { Api, MenuAction, RecoveryRecord, SaveResult, UnsavedChoice } from '../../../preload/index.d'
+
+let browserDirty = false
+let browserDocTitle = ''
+
+function syncBrowserTitle(): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+  document.title = formatWindowTitle(browserDocTitle, browserDirty)
+}
 
 const RECOVERY_STORAGE_KEY = 'orchestrator.recovery'
 
@@ -26,7 +37,12 @@ function readRecoveryFromStorage(): RecoveryRecord | null {
     return null
   }
 }
-let unsavedConfirm: (message?: string) => Promise<UnsavedChoice> = async () => 'discard'
+/** boot 挂上对话框之前：取消，而不是默默丢弃未保存改动。 */
+export function unsavedConfirmFallback(_message?: string): Promise<UnsavedChoice> {
+  return Promise.resolve('cancel')
+}
+
+let unsavedConfirm: (message?: string) => Promise<UnsavedChoice> = unsavedConfirmFallback
 
 export function setUnsavedConfirm(handler: (message?: string) => Promise<UnsavedChoice>): void {
   unsavedConfirm = handler
@@ -97,9 +113,13 @@ const browserApi: Api = {
     return name
   },
   readFlow: async () => null,
-  setDirty: () => undefined,
+  setDirty: (dirty) => {
+    browserDirty = dirty
+    syncBrowserTitle()
+  },
   setDocumentTitle: (title) => {
-    document.title = title ? `${title} — Orchestrator` : 'Orchestrator'
+    browserDocTitle = title
+    syncBrowserTitle()
   },
   reportSaveResult: (_result: SaveResult) => undefined,
   onMenuAction: (_cb: (action: MenuAction) => void) => () => undefined,

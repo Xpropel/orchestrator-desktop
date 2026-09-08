@@ -22,7 +22,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
     'control',
     'start',
     [
-      { key: 'inputs', label: '入参', type: 'inputs', default: [], hint: '声明后可被下游以 {{start.key}} 或节点名引用' },
+      { key: 'inputs', label: '入参', type: 'inputs', default: [], hint: '声明后可被下游以 {{节点名.key}} 引用' },
       {
         key: 'mode',
         label: '模式',
@@ -277,7 +277,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         label: '字段定义',
         type: 'inputs',
         default: [],
-        hint: '声明后可被下游以 {{节点名.字段}} 引用'
+        hint: '声明后可被下游以 {{节点名.key}} 引用'
       },
       {
         key: 'inline_data',
@@ -290,6 +290,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         key: 'path',
         label: '文件路径',
         type: 'string',
+        required: true,
         hint: '本地文件路径',
         showWhen: { key: 'source', equals: 'file' }
       },
@@ -297,6 +298,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         key: 'url',
         label: '地址',
         type: 'string',
+        required: true,
         hint: '远程数据地址',
         showWhen: { key: 'source', equals: 'url' }
       },
@@ -304,6 +306,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         key: 'upstream_ref',
         label: '上游引用',
         type: 'template',
+        required: true,
         hint: '引用上游变量，如 {{Node.data}}',
         showWhen: { key: 'source', equals: 'upstream' }
       },
@@ -357,7 +360,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
           { label: 'JavaScript', value: 'javascript' }
         ]
       },
-      { key: 'code', label: '代码', type: 'code', required: true, extra: { language: 'python' } },
+      { key: 'code', label: '代码', type: 'code', required: true },
       { key: 'arguments', label: '参数', type: 'keyValue', default: {} }
     ],
     [
@@ -423,12 +426,14 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         key: 'expression',
         label: 'JSONPath',
         type: 'expression',
+        required: true,
         showWhen: { key: 'mode', equals: 'jsonpath' }
       },
       {
         key: 'template',
         label: '模板',
         type: 'template',
+        required: true,
         showWhen: { key: 'mode', equals: 'template' }
       }
     ],
@@ -463,7 +468,20 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
           { label: '展平', value: 'flatten' }
         ]
       },
-      { key: 'expression', label: '表达式', type: 'expression' },
+      {
+        key: 'expression',
+        label: '映射表达式',
+        type: 'expression',
+        required: true,
+        showWhen: { key: 'operation', equals: 'map' }
+      },
+      {
+        key: 'filterExpression',
+        label: '过滤表达式',
+        type: 'expression',
+        required: true,
+        showWhen: { key: 'operation', equals: 'filter' }
+      },
       {
         key: 'start',
         label: '起始',
@@ -508,6 +526,7 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         key: 'search',
         label: '查找',
         type: 'string',
+        required: true,
         showWhen: { key: 'operation', equals: 'replace' }
       },
       {
@@ -521,6 +540,14 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
         label: '分隔符',
         type: 'string',
         showWhen: { key: 'operation', equals: 'split' }
+      },
+      {
+        key: 'joinWith',
+        label: '连接符',
+        type: 'string',
+        default: ',',
+        required: true,
+        showWhen: { key: 'operation', equals: 'join' }
       }
     ],
     [
@@ -703,10 +730,11 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
     'task',
     [
       { key: 'prompt', label: '提示', type: 'template', required: true },
-      { key: 'fields', label: '字段', type: 'inputs', default: [] },
+      { key: 'fields', label: '字段', type: 'inputs', default: [], hint: '声明后可被下游以 {{节点名.key}} 引用' },
       { key: 'timeout', label: '超时（秒）', type: 'number', default: 0, hint: '0 为不限' }
     ],
-    [{ name: 'values', type: 'object' }]
+    [{ name: 'values', type: 'object' }],
+    { constraints: { outputsFromParam: 'fields' } }
   ),
   op(
     'approval',

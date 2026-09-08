@@ -12,7 +12,8 @@ import { getOperator, hasOperator } from '@/core/registry'
 import type { FlowNode, XYPosition } from '@/core/types'
 
 export interface PlanAddOptions {
-  parentId?: string
+  /** `null` = 强制顶层；省略整个 options 才按落点推断容器。 */
+  parentId?: string | null
 }
 
 export type PlanAddResult = { ok: false; toast?: string } | { ok: true; node: FlowNode }
@@ -30,13 +31,14 @@ export function planAddAtFlowPosition(
   if (def.kind === 'loopStart') return { ok: false }
 
   const skipParent = def.kind === 'container' || def.kind === 'start'
-  let parentId = skipParent ? undefined : options?.parentId
+  const inferParent = options === undefined
+  let parentId = skipParent ? undefined : (options?.parentId ?? undefined)
   let position = {
     x: center.x - getNodeCenterOffset(type).x,
     y: center.y - getNodeCenterOffset(type).y
   }
 
-  if (!parentId && !skipParent) {
+  if (inferParent && !parentId && !skipParent) {
     const hit = findContainingContainer(center, nodes)
     if (hit) {
       parentId = hit.id

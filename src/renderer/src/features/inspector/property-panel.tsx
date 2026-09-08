@@ -1,4 +1,4 @@
-import type { JSX } from 'react'
+import { useEffect, useState, type JSX } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ACTION_LABEL } from '@shared/action-labels'
 import { SchemaForm } from '@/features/inspector/schema-form'
@@ -10,7 +10,7 @@ import { isProtectedNode } from '@/core/graph'
 import { getExtensionGlobals } from '@/core/library'
 import { getOperator, hasOperator } from '@/core/registry'
 import { isRecord } from '@/core/schema'
-import { getNodeOutputs } from '@/core/variables'
+import { getNodeOutputs, invalidNodeNameReason } from '@/core/variables'
 import { selectNodeIssues, useValidationStore } from '@/state/validation-store'
 import { useFlowStore } from '@/state/flow-store'
 import { useStableNode } from '@/state/select-node'
@@ -32,6 +32,37 @@ function parseGlobalJson(text: string): unknown {
   } catch {
     return undefined
   }
+}
+
+function GlobalJsonField({
+  globalKey,
+  value,
+  revision,
+  onCommit
+}: {
+  globalKey: string
+  value: unknown
+  revision: number
+  onCommit: (parsed: unknown) => void
+}): JSX.Element {
+  const [invalid, setInvalid] = useState(false)
+  return (
+    <Field label={`globals.${globalKey}`} hint="JSON" error={invalid ? 'JSON 无法解析' : undefined}>
+      <DebouncedTextarea
+        key={`globals-json:${globalKey}:${revision}`}
+        value={stringifyGlobal(value)}
+        onCommit={(next) => {
+          const parsed = parseGlobalJson(next)
+          if (parsed === undefined && next.trim().length > 0) {
+            setInvalid(true)
+            return
+          }
+          setInvalid(false)
+          onCommit(parsed)
+        }}
+      />
+    </Field>
+  )
 }
 
 /** 属性面板正文（流程 / 节点两种），由 `features/inspector/floating-inspector.tsx` 承载。 */
@@ -94,17 +125,13 @@ export function FlowProperties(): JSX.Element {
       })}
 
       {extraGlobalKeys.map((key) => (
-        <Field key={key} label={`globals.${key}`} hint="JSON">
-          <DebouncedTextarea
-            key={`globals-json:${key}:${revision}`}
-            value={stringifyGlobal(globals[key])}
-            onCommit={(next) => {
-              const parsed = parseGlobalJson(next)
-              if (parsed === undefined && next.trim().length > 0) return
-              setGlobals({ [key]: parsed })
-            }}
-          />
-        </Field>
+        <GlobalJsonField
+          key={key}
+          globalKey={key}
+          value={globals[key]}
+          revision={revision}
+          onCommit={(parsed) => setGlobals({ [key]: parsed })}
+        />
       ))}
 
       <p className="text-[11px] font-medium uppercase tracking-wide text-secondary">全局变量</p>
@@ -150,6 +177,11 @@ export function NodeProperties({
   const removeNode = useFlowStore((state) => state.removeNode)
   const revision = useFlowStore((state) => state.revision)
   const issues = useValidationStore((state) => selectNodeIssues(state, nodeId))
+  const [nameDraftError, setNameDraftError] = useState<string | undefined>()
+
+  useEffect(() => {
+    setNameDraftError(undefined)
+  }, [nodeId])
 
   if (!node) {
     return null
@@ -184,11 +216,33 @@ export function NodeProperties({
         </div>
       ) : null}
 
-      <Field label="名称">
+      <Field
+        label="名称"
+        error={
+          nameDraftError ??
+          invalidNodeNameReason(node.data.name) ??
+          (nodes.some((item) => item.id !== nodeId && item.data.name === node.data.name)
+            ? '节点名称重复'
+            : undefined)
+        }
+      >
         <DebouncedInput
           key={`${nodeId}:name:${revision}`}
           value={node.data.name}
-          onCommit={(name) => updateNodeData(nodeId, { name })}
+          onLocalChange={() => setNameDraftError(undefined)}
+          onCommit={(name) => {
+            const invalid = invalidNodeNameReason(name)
+            if (invalid) {
+              setNameDraftError(invalid)
+              return
+            }
+            if (nodes.some((item) => item.id !== nodeId && item.data.name === name)) {
+              setNameDraftError('节点名称重复')
+              return
+            }
+            setNameDraftError(undefined)
+            updateNodeData(nodeId, { name })
+          }}
         />
       </Field>
       <Field label="描述">

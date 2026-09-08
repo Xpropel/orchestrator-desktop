@@ -36,7 +36,11 @@ export function useFloatingCard(storageKey: string, limits: CardLimits): Floatin
   const [overlay, setOverlay] = useState<HTMLDivElement | null>(null)
   const [container, setContainer] = useState<Size>({ width: 0, height: 0 })
   const [rect, setRect] = useState<CardRect | null>(null)
-  const [visibleHeight, setVisibleHeight] = useState(CARD_HEADER_HEIGHT)
+  const [visibleHeight, setVisibleHeightState] = useState(CARD_HEADER_HEIGHT)
+  const setVisibleHeight = useCallback((height: number) => {
+    const next = Math.max(CARD_HEADER_HEIGHT, Math.round(height))
+    setVisibleHeightState((current) => (current === next ? current : next))
+  }, [])
   const limitsRef = useRef(limits)
   limitsRef.current = limits
 
@@ -76,7 +80,11 @@ export function useFloatingCard(storageKey: string, limits: CardLimits): Floatin
       const start = rect
       const origin = { x: event.clientX, y: event.clientY }
       let latest = rect
-      target.setPointerCapture(event.pointerId)
+      try {
+        target.setPointerCapture(event.pointerId)
+      } catch {
+        // 元素未连接时 capture 会抛；仍监听 pointerup。
+      }
 
       const onMove = (move: PointerEvent): void => {
         latest = clampRect(
@@ -91,11 +99,20 @@ export function useFloatingCard(storageKey: string, limits: CardLimits): Floatin
         target.removeEventListener('pointermove', onMove)
         target.removeEventListener('pointerup', onUp)
         target.removeEventListener('pointercancel', onUp)
+        target.removeEventListener('lostpointercapture', onUp)
+        try {
+          if (target.hasPointerCapture(event.pointerId)) {
+            target.releasePointerCapture(event.pointerId)
+          }
+        } catch {
+          // 窗口外松手或节点已卸载。
+        }
         storeRect(storageKey, latest)
       }
       target.addEventListener('pointermove', onMove)
       target.addEventListener('pointerup', onUp)
       target.addEventListener('pointercancel', onUp)
+      target.addEventListener('lostpointercapture', onUp)
     },
     [container, rect, storageKey, visibleHeight]
   )

@@ -111,6 +111,7 @@ export interface CategoryItem {
 }
 
 export interface InputItem {
+  id?: string
   key: string
   type: VarType
   required: boolean

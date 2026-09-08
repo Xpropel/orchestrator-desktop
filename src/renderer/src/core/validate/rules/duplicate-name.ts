@@ -5,7 +5,7 @@ export function ruleDuplicateName(nodes: FlowNode[]): FlowIssue[] {
   const issues: FlowIssue[] = []
   const nameCounts = new Map<string, FlowNode[]>()
   for (const node of nodes) {
-    const name = node.data.name
+    const name = node.data.name.trim()
     const list = nameCounts.get(name)
     if (list) list.push(node)
     else nameCounts.set(name, [node])

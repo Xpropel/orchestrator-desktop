@@ -18,12 +18,13 @@ import { listCategories } from '@/core/registry'
 import type { OperatorCategory, OperatorDefinition } from '@/core/schema'
 import { useFlowStore } from '@/state/flow-store'
 import { useUiStore } from '@/state/ui-store'
-import { OperatorFlyout, FLYOUT_WIDTH } from './operator-flyout'
+import { OperatorFlyout } from './operator-flyout'
 import {
   PALETTE_DEFAULT_WIDTH,
   PALETTE_MAX_WIDTH,
   PALETTE_RAIL_WIDTH,
   isRailWidth,
+  placeOperatorFlyout,
   snapPaletteWidth
 } from './palette-width'
 
@@ -43,8 +44,6 @@ const LIMITS: CardLimits = {
 }
 
 const EDGES = ['right', 'bottom', 'bottom-right'] as const
-const FLYOUT_GAP = 8
-const FLYOUT_MIN_HEIGHT = 360
 
 export function FloatingPalette({ onAddOperator }: { onAddOperator: (type: string) => void }): JSX.Element {
   const card = useFloatingCard('orchestrator.palette.rect', LIMITS)
@@ -56,18 +55,11 @@ export function FloatingPalette({ onAddOperator }: { onAddOperator: (type: strin
   const rect = card.rect
   const rail = rect ? isRailWidth(rect.width) : false
 
-  // 飞出面板贴在卡片右侧；右侧放不下就翻到左侧。
+  // 飞出面板贴在卡片旁；右侧放不下就翻到左侧，靠近底边时上移以免溢出。
   const flyoutStyle = useMemo(() => {
     if (!rect) return null
-    const rightX = rect.x + rect.width + FLYOUT_GAP
-    const fitsRight = rightX + FLYOUT_WIDTH <= card.container.width - CARD_MARGIN
-    const left = fitsRight ? rightX : Math.max(CARD_MARGIN, rect.x - FLYOUT_GAP - FLYOUT_WIDTH)
-    const height = Math.min(
-      Math.max(card.visibleHeight, FLYOUT_MIN_HEIGHT),
-      Math.max(160, card.container.height - rect.y - CARD_MARGIN)
-    )
-    return { left, top: rect.y, height, side: fitsRight ? ('right' as const) : ('left' as const) }
-  }, [card.container.height, card.container.width, card.visibleHeight, rect])
+    return placeOperatorFlyout(rect, card.container, card.visibleHeight, CARD_MARGIN)
+  }, [card.container, card.visibleHeight, rect])
 
   const close = (): void => {
     setOpen(false)

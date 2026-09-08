@@ -5,6 +5,7 @@ import { fileApi } from '@/platform/platform'
 import { useFlowStore } from '@/state/flow-store'
 import {
   FIRST_SNAPSHOT_DELAY_MS,
+  resetRecoveryRestoreGate,
   resetRecoveryWriteCache,
   restoreRecoveryIfPresent,
   subscribeDirtyRecovery,
@@ -15,6 +16,7 @@ describe('crash recovery via fileApi', () => {
   beforeEach(() => {
     useFlowStore.getState().resetToEmpty()
     resetRecoveryWriteCache()
+    resetRecoveryRestoreGate()
     vi.restoreAllMocks()
   })
 

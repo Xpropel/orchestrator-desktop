@@ -81,6 +81,8 @@ export function createOperatorNode(
 
   if (def.kind === 'note') {
     node.style = { width: 200, height: 140 }
+    node.width = 200
+    node.height = 140
   }
 
   if (def.kind === 'container') {

@@ -1,9 +1,10 @@
 import { nanoid } from 'nanoid'
 import { deepClone } from './clone'
 import { keyValueItemsToRecord, parseCases, parseCategories, parseKeyValueItems } from './form-items'
+import { normalizeStoredEdge } from './graph/connection'
 import { stripRuntimeEdge, stripRuntimeNode } from './graph/snapshot'
 import { parentIdOf } from './graph/parent-id'
-import { HANDLE_ELSE } from './handles'
+import { HANDLE_ELSE, logicalHandleId } from './handles'
 import { migrateLabel, resolveOperatorType } from './migrations'
 import { getNodeTypeForKind, getOperator, getSourceHandles, hasOperator } from './registry'
 import { isRecord } from './schema'
@@ -38,6 +39,12 @@ function targetsForHandle(edges: FlowEdge[], sourceId: string, handleId: string)
 }
 
 function applyBranchTargets(params: Record<string, unknown>, nodeId: string, edges: FlowEdge[], type: string): void {
+  if (Array.isArray(params.cases)) {
+    params.cases = parseCases(params.cases)
+  }
+  if (Array.isArray(params.categories)) {
+    params.categories = parseCategories(params.categories)
+  }
   const handles = getSourceHandles(type, params)
   for (const handle of handles) {
     const to = targetsForHandle(edges, nodeId, handle.id)
@@ -206,8 +213,12 @@ function toFlowEdge(raw: Record<string, unknown>, index: number): FlowEdge {
     source: raw.source,
     target: raw.target
   }
-  if (typeof raw.sourceHandle === 'string' || raw.sourceHandle === null) edge.sourceHandle = raw.sourceHandle
-  if (typeof raw.targetHandle === 'string' || raw.targetHandle === null) edge.targetHandle = raw.targetHandle
+  if (typeof raw.sourceHandle === 'string' || raw.sourceHandle === null) {
+    edge.sourceHandle = typeof raw.sourceHandle === 'string' ? (logicalHandleId(raw.sourceHandle) ?? raw.sourceHandle) : raw.sourceHandle
+  }
+  if (typeof raw.targetHandle === 'string' || raw.targetHandle === null) {
+    edge.targetHandle = typeof raw.targetHandle === 'string' ? (logicalHandleId(raw.targetHandle) ?? raw.targetHandle) : raw.targetHandle
+  }
   if (typeof raw.type === 'string') edge.type = raw.type
   if (typeof raw.selected === 'boolean') edge.selected = raw.selected
   return edge
@@ -223,7 +234,9 @@ function adaptImportedNode(
     throw new Error(`Invalid FlowDocument: graph.nodes[${index}] is missing a string id`)
   }
   const node = toFlowNode(raw)
-  const originalLabel = node.data.label
+  const componentName = components[id]?.obj?.component_name
+  const originalLabel =
+    node.data.label || (typeof componentName === 'string' && componentName.length > 0 ? componentName : '')
   if (!originalLabel) {
     throw new Error(`Invalid FlowDocument: node "${id}" is missing type and a valid data.label`)
   }
@@ -287,7 +300,7 @@ export function graphToDocument(
   globals: Record<string, unknown> = {}
 ): FlowDocument {
   const cleanNodes = nodes.map(stripRuntimeNode)
-  const cleanEdges = edges.map(stripRuntimeEdge)
+  const cleanEdges = edges.map((edge) => stripRuntimeEdge(normalizeStoredEdge(cleanNodes, edge)))
   const components: FlowDocument['components'] = {}
 
   for (const node of cleanNodes) {
@@ -384,41 +397,104 @@ export function serializeDocument(doc: FlowDocument): string {
   )
 }
 
-function asFlowDocumentFromRagflow(raw: Record<string, unknown>): FlowDocument {
-  const graph = raw.graph as { nodes: FlowNode[]; edges: FlowEdge[] }
-  const title = typeof raw.title === 'string' && raw.title.length > 0 ? raw.title : 'Untitled'
+/** 文档内 title：字符串，或 i18n 对象取 zh/en/de。 */
+export function pickDocumentTitle(value: unknown): string {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim()
+  }
+  if (!isRecord(value)) {
+    return ''
+  }
+  for (const key of ['zh', 'en', 'de']) {
+    const part = value[key]
+    if (typeof part === 'string' && part.trim().length > 0) {
+      return part.trim()
+    }
+  }
+  for (const part of Object.values(value)) {
+    if (typeof part === 'string' && part.trim().length > 0) {
+      return part.trim()
+    }
+  }
+  return ''
+}
+
+function graphRecordOf(value: Record<string, unknown>): Record<string, unknown> | null {
+  return isRecord(value.graph) ? value.graph : null
+}
+
+function hasGraphNodes(value: Record<string, unknown>): boolean {
+  return Array.isArray(graphRecordOf(value)?.nodes)
+}
+
+function asFlowDocumentFromRagflow(raw: Record<string, unknown>, fallbackTitle = 'Untitled'): FlowDocument {
+  const graph = isRecord(raw.graph) ? raw.graph : {}
+  const title = pickDocumentTitle(raw.title) || fallbackTitle
   const globals = isRecord(raw.globals) ? (raw.globals as Record<string, unknown>) : {}
   const components = isRecord(raw.components) ? (raw.components as FlowDocument['components']) : {}
   return {
     version: 1,
     title,
     graph: {
-      nodes: Array.isArray(graph.nodes) ? graph.nodes : [],
-      edges: Array.isArray(graph.edges) ? graph.edges : []
+      nodes: Array.isArray(graph.nodes) ? (graph.nodes as FlowNode[]) : [],
+      edges: Array.isArray(graph.edges) ? (graph.edges as FlowEdge[]) : []
     },
     components,
     globals
   }
 }
 
-export function parseDocument(text: string): FlowDocument {
+export function coerceToFlowDocument(parsed: unknown, fallbackTitle = 'Untitled'): FlowDocument {
+  if (!isRecord(parsed)) {
+    throw new Error('Invalid FlowDocument: expected an object')
+  }
+
+  if (isFlowDocument(parsed)) {
+    return {
+      version: 1,
+      title: parsed.title,
+      graph: parsed.graph,
+      components: parsed.components ?? {},
+      globals: parsed.globals ?? {}
+    }
+  }
+
+  if (isRecord(parsed.dsl) && hasGraphNodes(parsed.dsl)) {
+    const dsl: Record<string, unknown> = { ...parsed.dsl }
+    const title = pickDocumentTitle(parsed.title) || pickDocumentTitle(dsl.title) || fallbackTitle
+    return asFlowDocumentFromRagflow({ ...dsl, title }, fallbackTitle)
+  }
+
+  if (hasGraphNodes(parsed)) {
+    return asFlowDocumentFromRagflow(parsed, fallbackTitle)
+  }
+
+  if (Array.isArray(parsed.nodes)) {
+    return {
+      version: 1,
+      title: pickDocumentTitle(parsed.title) || fallbackTitle,
+      graph: {
+        nodes: parsed.nodes as FlowNode[],
+        edges: Array.isArray(parsed.edges) ? (parsed.edges as FlowEdge[]) : []
+      },
+      components: {},
+      globals: isRecord(parsed.globals) ? (parsed.globals as Record<string, unknown>) : {}
+    }
+  }
+
+  if (isRagflowDocument(parsed)) {
+    return asFlowDocumentFromRagflow(parsed, fallbackTitle)
+  }
+
+  throw new Error('Invalid FlowDocument: expected version 1 with a string title and graph.nodes/edges')
+}
+
+export function parseDocument(text: string, options?: { fallbackTitle?: string }): FlowDocument {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
   } catch {
     throw new Error('Invalid FlowDocument: malformed JSON')
   }
-  if (isRagflowDocument(parsed)) {
-    return asFlowDocumentFromRagflow(parsed as Record<string, unknown>)
-  }
-  if (!isFlowDocument(parsed)) {
-    throw new Error('Invalid FlowDocument: expected version 1 with a string title and graph.nodes/edges')
-  }
-  return {
-    version: 1,
-    title: parsed.title,
-    graph: parsed.graph,
-    components: parsed.components ?? {},
-    globals: parsed.globals ?? {}
-  }
+  return coerceToFlowDocument(parsed, options?.fallbackTitle ?? 'Untitled')
 }

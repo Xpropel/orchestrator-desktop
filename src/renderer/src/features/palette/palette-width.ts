@@ -17,3 +17,23 @@ export function snapPaletteWidth(width: number): number {
 export function isRailWidth(width: number): boolean {
   return width <= PALETTE_RAIL_WIDTH
 }
+
+export const FLYOUT_WIDTH = 280
+export const FLYOUT_GAP = 8
+export const FLYOUT_MIN_HEIGHT = 360
+
+export function placeOperatorFlyout(
+  rect: { x: number; y: number; width: number },
+  container: { width: number; height: number },
+  visibleHeight: number,
+  margin = 12
+): { left: number; top: number; height: number; side: 'left' | 'right' } {
+  const rightX = rect.x + rect.width + FLYOUT_GAP
+  const fitsRight = rightX + FLYOUT_WIDTH <= container.width - margin
+  const left = fitsRight ? rightX : Math.max(margin, rect.x - FLYOUT_GAP - FLYOUT_WIDTH)
+  const maxHeight = Math.max(80, container.height - margin * 2)
+  const height = Math.min(Math.max(visibleHeight, FLYOUT_MIN_HEIGHT), maxHeight)
+  const maxTop = container.height - margin - height
+  const top = Math.min(Math.max(rect.y, margin), Math.max(margin, maxTop))
+  return { left, top, height, side: fitsRight ? 'right' : 'left' }
+}

@@ -20,8 +20,20 @@ function omitKeys<T extends object>(value: T, keys: readonly string[]): T {
   return cloned
 }
 
+function persistExplicitSize(node: FlowNode): FlowNode {
+  const width = node.width
+  const height = node.height
+  if (typeof width !== 'number' && typeof height !== 'number') return node
+  const prev = node.style && typeof node.style === 'object' ? (node.style as Record<string, unknown>) : {}
+  const nextStyle: Record<string, unknown> = { ...prev }
+  if (typeof width === 'number') nextStyle.width = width
+  if (typeof height === 'number') nextStyle.height = height
+  if (prev.width === nextStyle.width && prev.height === nextStyle.height) return node
+  return { ...node, style: nextStyle }
+}
+
 export function stripRuntimeNode(node: FlowNode): FlowNode {
-  return omitKeys(node, NODE_RUNTIME_KEYS)
+  return persistExplicitSize(omitKeys(node, NODE_RUNTIME_KEYS))
 }
 
 export function stripRuntimeEdge(edge: FlowEdge): FlowEdge {

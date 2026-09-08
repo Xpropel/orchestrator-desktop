@@ -5,7 +5,7 @@ import { appState } from './app-state'
 import { promptUnsaved } from './unsaved-dialog'
 import { applyTitle } from './title'
 
-type SaveWaitResult = SaveResult | 'timeout'
+export type SaveWaitResult = SaveResult | 'timeout' | 'failed'
 
 type Pending = {
   timer: ReturnType<typeof setTimeout>
@@ -15,11 +15,19 @@ type Pending = {
 const SAVE_WAIT_MS = 60_000
 let pending: Pending | null = null
 
-function waitForRendererSaveResult(timeoutMs: number): Promise<SaveWaitResult> {
+export function failPendingSave(result: SaveWaitResult = 'failed'): void {
+  if (!pending) {
+    return
+  }
+  clearTimeout(pending.timer)
+  const { resolve } = pending
+  pending = null
+  resolve(result)
+}
+
+export function waitForRendererSaveResult(timeoutMs: number): Promise<SaveWaitResult> {
   if (pending) {
-    clearTimeout(pending.timer)
-    pending.resolve('timeout')
-    pending = null
+    failPendingSave('timeout')
   }
 
   return new Promise((resolve) => {
@@ -35,18 +43,7 @@ export function reportRendererSaveResult(result: SaveResult): void {
   if (!pending) {
     return
   }
-  clearTimeout(pending.timer)
-  const { resolve } = pending
-  pending = null
-  resolve(result)
-}
-
-function clearPendingSave(): void {
-  if (!pending) {
-    return
-  }
-  clearTimeout(pending.timer)
-  pending = null
+  failPendingSave(result)
 }
 
 export function isSaveResult(value: unknown): value is SaveResult {
@@ -58,7 +55,7 @@ export function attachCloseGuard(win: BrowserWindow): void {
 
   win.webContents.on('render-process-gone', () => {
     if (pending) {
-      clearPendingSave()
+      failPendingSave('failed')
       appState.dirty = true
     }
   })
@@ -82,7 +79,6 @@ export function attachCloseGuard(win: BrowserWindow): void {
           win.webContents.send('menu:action', 'save')
           const result = await waitForRendererSaveResult(SAVE_WAIT_MS)
           if (result !== 'saved') {
-            clearPendingSave()
             appState.dirty = true
             appState.ignoreCloseGuard = false
             if (!win.isDestroyed()) {

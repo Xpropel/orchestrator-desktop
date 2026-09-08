@@ -28,12 +28,13 @@ export interface ClipboardSlice {
 export interface ContainerSlice {
   setNodeParent: (nodeId: string, parentId: string | null, relativePosition: XYPosition) => void
   removeNode: (id: string) => void
+  removeSelected: () => void
 }
 
 export interface DirtySlice {
   dirty: boolean
   savedSnapshotKey: string
-  markSaved: (filePath: string) => void
+  markSaved: (filePath: string, written?: Pick<GraphSnapshot, 'nodes' | 'edges' | 'title' | 'globals'>) => void
   markUnsaved: () => void
   loadDocument: (doc: FlowDocument, filePath: string | null) => void
   resetToEmpty: () => void

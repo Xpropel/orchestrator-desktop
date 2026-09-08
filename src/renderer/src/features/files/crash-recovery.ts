@@ -8,9 +8,14 @@ export const SNAPSHOT_INTERVAL_MS = 20_000
 export const FIRST_SNAPSHOT_DELAY_MS = 3_000
 
 let lastWrittenContent = ''
+let restoreInFlight: Promise<'none' | 'restored' | 'discarded' | 'failed'> | null = null
 
 export function resetRecoveryWriteCache(): void {
   lastWrittenContent = ''
+}
+
+export function resetRecoveryRestoreGate(): void {
+  restoreInFlight = null
 }
 
 export async function writeRecoverySnapshot(): Promise<void> {
@@ -56,28 +61,34 @@ export async function restoreRecoveryIfPresent(
     alert: (message) => window.alert(message)
   }
 ): Promise<'none' | 'restored' | 'discarded' | 'failed'> {
-  const record = await fileApi.readRecovery()
-  if (!record) {
-    return 'none'
+  if (restoreInFlight) {
+    return restoreInFlight
   }
-  const where = record.filePath ? `\n文件：${record.filePath}` : '\n（尚未保存到文件）'
-  const accepted = ui.confirm(
-    `检测到上次未保存的流程（${formatSavedAt(record.savedAt)}）。${where}\n\n是否恢复？选择“取消”将丢弃该快照。`
-  )
-  if (!accepted) {
-    await clearRecoverySnapshot()
-    return 'discarded'
-  }
-  try {
-    loadFlowFromText(record.content, record.filePath)
-    useFlowStore.getState().markUnsaved()
-    lastWrittenContent = record.content
-    return 'restored'
-  } catch (error) {
-    ui.alert(`恢复失败：${error instanceof Error ? error.message : '快照已损坏'}`)
-    await clearRecoverySnapshot()
-    return 'failed'
-  }
+  restoreInFlight = (async () => {
+    const record = await fileApi.readRecovery()
+    if (!record) {
+      return 'none'
+    }
+    const where = record.filePath ? `\n文件：${record.filePath}` : '\n（尚未保存到文件）'
+    const accepted = ui.confirm(
+      `检测到上次未保存的流程（${formatSavedAt(record.savedAt)}）。${where}\n\n是否恢复？选择“取消”将丢弃该快照。`
+    )
+    if (!accepted) {
+      await clearRecoverySnapshot()
+      return 'discarded'
+    }
+    try {
+      loadFlowFromText(record.content, record.filePath)
+      useFlowStore.getState().markUnsaved()
+      lastWrittenContent = record.content
+      return 'restored'
+    } catch (error) {
+      ui.alert(`恢复失败：${error instanceof Error ? error.message : '快照已损坏'}`)
+      await clearRecoverySnapshot()
+      return 'failed'
+    }
+  })()
+  return restoreInFlight
 }
 
 /** 订阅 dirty：3s 后写第一份快照，之后按间隔续写；变干净则清除。 */
@@ -87,17 +98,26 @@ export function subscribeDirtyRecovery(): () => void {
     void writeRecoverySnapshot()
   }, SNAPSHOT_INTERVAL_MS)
 
+  const armFirstWrite = (): void => {
+    if (firstTimer !== null) {
+      return
+    }
+    firstTimer = globalThis.setTimeout(() => {
+      firstTimer = null
+      void writeRecoverySnapshot()
+    }, FIRST_SNAPSHOT_DELAY_MS)
+  }
+
+  if (useFlowStore.getState().dirty) {
+    armFirstWrite()
+  }
+
   const unsubscribe = useFlowStore.subscribe((state, prev) => {
     if (state.dirty === prev.dirty) {
       return
     }
     if (state.dirty) {
-      if (firstTimer === null) {
-        firstTimer = globalThis.setTimeout(() => {
-          firstTimer = null
-          void writeRecoverySnapshot()
-        }, FIRST_SNAPSHOT_DELAY_MS)
-      }
+      armFirstWrite()
       return
     }
     if (firstTimer !== null) {
