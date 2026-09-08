@@ -10,7 +10,9 @@ import { OrderedSourcePorts, orderedPortsMinHeight, useStartOutgoingCount } from
 export const TaskNode = memo(function TaskNode({
   id,
   data,
-  selected
+  selected,
+  width,
+  height
 }: NodeProps<CanvasNode>): JSX.Element {
   const summary = getNodeSummary(data)
   // 输出变量（供下游 {{名称.变量}} 引用），含 outputsFromParam 派生的字段；与出边数量无关。
@@ -20,11 +22,11 @@ export const TaskNode = memo(function TaskNode({
   return (
     <div
       data-testid={`node-task-${data.label}`}
-      className="relative"
+      className="relative h-full"
       style={{ minHeight: orderedPortsMinHeight(occupied) }}
     >
       <FlowHandle type="target" id="end" position={Position.Left} />
-      <NodeChrome id={id} data={data} selected={selected}>
+      <NodeChrome id={id} data={data} selected={selected} width={width} height={height}>
         {summary ? (
           <div className="border-t border-border px-3 py-1.5 text-[11px] text-secondary">
             <span className="line-clamp-2">{summary}</span>

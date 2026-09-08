@@ -7,13 +7,20 @@ import { useFlowStore } from '@/state/flow-store'
 import { cn } from '@/ui/cn'
 import { resolveIcon } from '@/ui/icons'
 import { ModelProviderIcon } from '@/ui/model-icons'
+import { CardResizer, cardBoxStyle } from './card-resizer'
 import { NodeHoverToolbar } from './node-hover-toolbar'
 import { NodeIssueBadge } from './node-issue-badge'
+
+export const CARD_DEFAULT_WIDTH = 240
+export const CARD_MIN_WIDTH = 200
+export const CARD_MIN_HEIGHT = 60
 
 export const NodeChrome = memo(function NodeChrome({
   id,
   selected,
   data,
+  width,
+  height,
   showDelete = true,
   showCopy = true,
   children
@@ -21,6 +28,9 @@ export const NodeChrome = memo(function NodeChrome({
   id: string
   selected: boolean
   data: BaseNodeData
+  /** 节点的显式尺寸（用户拉伸过才有），来自 NodeProps */
+  width?: number
+  height?: number
   showDelete?: boolean
   showCopy?: boolean
   children?: ReactNode
@@ -37,12 +47,14 @@ export const NodeChrome = memo(function NodeChrome({
   return (
     <div
       className={cn(
-        'orchestrator-card relative w-[240px] rounded-lg border border-border bg-elevated shadow-sm',
+        'orchestrator-card relative flex flex-col rounded-lg border border-border bg-elevated shadow-sm',
         selected && 'orchestrator-card-selected'
       )}
+      style={{ ...cardBoxStyle(width, height, CARD_DEFAULT_WIDTH), minWidth: CARD_MIN_WIDTH }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      <CardResizer selected={selected} minWidth={CARD_MIN_WIDTH} minHeight={CARD_MIN_HEIGHT} />
       <NodeIssueBadge nodeId={id} />
       <NodeHoverToolbar
         nodeId={id}

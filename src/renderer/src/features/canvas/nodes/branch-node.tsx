@@ -11,14 +11,16 @@ const ROW_H = 32
 export const BranchNode = memo(function BranchNode({
   id,
   data,
-  selected
+  selected,
+  width,
+  height
 }: NodeProps<CanvasNode>): JSX.Element {
   const outlets = hasOperator(data.label) ? getSourceHandles(data.label, data.form) : []
 
   return (
-    <div data-testid={`node-branch-${data.label}`} className="relative">
+    <div data-testid={`node-branch-${data.label}`} className="relative h-full">
       <FlowHandle type="target" id="end" position={Position.Left} />
-      <NodeChrome id={id} data={data} selected={selected}>
+      <NodeChrome id={id} data={data} selected={selected} width={width} height={height}>
         <ul className="border-t border-border">
           {outlets.length === 0 ? (
             <li className="px-3 py-2 text-[11px] text-secondary">尚未配置出口</li>

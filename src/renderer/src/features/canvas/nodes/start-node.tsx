@@ -6,6 +6,7 @@ import { isProtectedNode } from '@/core/graph'
 import { getOperator, hasOperator } from '@/core/registry'
 import type { CanvasNode } from '@/features/canvas/flow-types'
 import { useFlowStore } from '@/state/flow-store'
+import { CardResizer, PILL_MIN_HEIGHT, PILL_MIN_WIDTH, cardBoxStyle } from './card-resizer'
 import { OrderedSourcePorts, orderedPortsMinHeight, useStartOutgoingCount } from './ordered-source-ports'
 import { NodeHoverToolbar } from './node-hover-toolbar'
 import { NodeIssueBadge } from './node-issue-badge'
@@ -13,7 +14,9 @@ import { NodeIssueBadge } from './node-issue-badge'
 export const StartNode = memo(function StartNode({
   id,
   data,
-  selected
+  selected,
+  width,
+  height
 }: NodeProps<CanvasNode>): JSX.Element {
   const [hovered, setHovered] = useState(false)
   const canDelete = useFlowStore((state) => {
@@ -32,10 +35,11 @@ export const StartNode = memo(function StartNode({
         'orchestrator-card relative flex items-center gap-2 rounded-full border border-border bg-elevated px-4 py-2 shadow-sm',
         selected && 'orchestrator-card-selected'
       )}
-      style={{ minHeight: orderedPortsMinHeight(occupied) }}
+      style={{ ...cardBoxStyle(width, height), minHeight: orderedPortsMinHeight(occupied) }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      <CardResizer selected={selected} minWidth={PILL_MIN_WIDTH} minHeight={PILL_MIN_HEIGHT} />
       <NodeIssueBadge nodeId={id} />
       <NodeHoverToolbar nodeId={id} visible={hovered || selected} showDelete={canDelete} showCopy={false} />
       <span
