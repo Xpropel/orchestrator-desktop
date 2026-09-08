@@ -14,8 +14,8 @@ Orchestrator Desktop is a standalone Electron app for designing agent and workfl
 
 | 文件 | 说明 |
 | --- | --- |
-| `Orchestrator Desktop-0.1.0-portable.exe` | 免安装，双击运行 |
-| `Orchestrator Desktop-0.1.0-setup.exe` | NSIS 安装包，可选安装目录 |
+| `Orchestrator.Desktop-0.1.0-portable.exe` | 免安装，双击运行 |
+| `Orchestrator.Desktop-0.1.0-setup.exe` | NSIS 安装包，可选安装目录 |
 
 可执行文件未代码签名，Windows SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。macOS（`dmg`）与 Linux（`AppImage`）可从源码用 `electron-builder.yml` 中的目标打包，尚未测试。
 
