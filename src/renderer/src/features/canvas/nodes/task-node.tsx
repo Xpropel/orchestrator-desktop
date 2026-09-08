@@ -1,23 +1,11 @@
 import { memo, type JSX } from 'react'
 import { Position, type NodeProps } from '@xyflow/react'
-import { parseInputs } from '@/core/form-items'
 import { getNodeSummary } from '@/core/graph'
-import { getOperator, hasOperator } from '@/core/registry'
-import type { BaseNodeData } from '@/core/types'
+import { getNodeOutputs } from '@/core/variables'
 import type { CanvasNode } from '@/features/canvas/flow-types'
 import { FlowHandle } from './flow-handle'
 import { NodeChrome } from './node-chrome'
 import { OrderedSourcePorts, orderedPortsMinHeight, useStartOutgoingCount } from './ordered-source-ports'
-
-/** 按 constraints.outputsFromParam 列出派生字段名（dataset.fields / start.inputs） */
-function derivedFieldNames(data: BaseNodeData): string[] {
-  if (!hasOperator(data.label)) return []
-  const key = getOperator(data.label).constraints?.outputsFromParam
-  if (!key) return []
-  return parseInputs(data.form[key])
-    .map((item) => item.key)
-    .filter((name) => name.length > 0)
-}
 
 export const TaskNode = memo(function TaskNode({
   id,
@@ -25,9 +13,8 @@ export const TaskNode = memo(function TaskNode({
   selected
 }: NodeProps<CanvasNode>): JSX.Element {
   const summary = getNodeSummary(data)
-  const def = hasOperator(data.label) ? getOperator(data.label) : null
-  const outputCount = def?.outputs.length ?? 0
-  const derived = derivedFieldNames(data)
+  // 输出变量（供下游 {{名称.变量}} 引用），含 outputsFromParam 派生的字段；与出边数量无关。
+  const outputNames = getNodeOutputs({ data }).map((item) => item.name)
   const occupied = useStartOutgoingCount(id)
 
   return (
@@ -43,17 +30,14 @@ export const TaskNode = memo(function TaskNode({
             <span className="line-clamp-2">{summary}</span>
           </div>
         ) : null}
-        {derived.length > 0 ? (
+        {outputNames.length > 0 ? (
           <div
-            data-testid="node-derived-fields"
-            className="border-t border-border px-3 py-1 text-[10px] text-secondary"
+            data-testid="node-outputs"
+            className="flex gap-1.5 border-t border-border px-3 py-1 text-[10px] text-secondary"
+            title={`输出变量：${outputNames.join(', ')}（下游以 {{${data.name}.变量}} 引用）`}
           >
-            {derived.join(' · ')}
-          </div>
-        ) : null}
-        {outputCount > 0 ? (
-          <div className="border-t border-border px-3 py-1 text-[10px] text-secondary">
-            {outputCount} outputs
+            <span className="shrink-0 opacity-70">输出变量</span>
+            <span className="min-w-0 truncate font-mono">{outputNames.join(' · ')}</span>
           </div>
         ) : null}
       </NodeChrome>

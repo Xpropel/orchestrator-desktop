@@ -332,9 +332,9 @@ export const BUILTIN_OPERATORS: OperatorDefinition[] = [
       }
     ],
     [
-      { name: 'data', type: 'array' },
-      { name: 'count', type: 'number' },
-      { name: 'schema', type: 'object' }
+      { name: 'data', type: 'array', description: '整个数据集（记录数组）' },
+      { name: 'count', type: 'number', description: '记录条数' },
+      { name: 'schema', type: 'object', description: '字段结构（由字段定义生成）' }
     ],
     { constraints: { allowRoot: true, outputsFromParam: 'fields' } }
   ),

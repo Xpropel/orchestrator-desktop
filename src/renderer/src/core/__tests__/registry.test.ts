@@ -117,11 +117,12 @@ describe('registry', () => {
       'description',
       'sample_limit'
     ])
-    expect(def.outputs).toEqual([
-      { name: 'data', type: 'array' },
-      { name: 'count', type: 'number' },
-      { name: 'schema', type: 'object' }
+    expect(def.outputs.map((item) => [item.name, item.type])).toEqual([
+      ['data', 'array'],
+      ['count', 'number'],
+      ['schema', 'object']
     ])
+    expect(def.outputs.every((item) => (item.description ?? '').length > 0)).toBe(true)
     expect(def.constraints).toEqual({ allowRoot: true, outputsFromParam: 'fields' })
 
     expect(getDefaultForm('dataset')).toMatchObject({

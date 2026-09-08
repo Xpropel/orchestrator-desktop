@@ -205,15 +205,21 @@ export function NodeProperties({
 
       {outputs.length > 0 ? (
         <div>
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-secondary">输出</p>
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-secondary">输出变量</p>
           <ul className="flex flex-col gap-1 rounded-md border border-border bg-elevated/40 px-2.5 py-2 text-xs">
             {outputs.map((item) => (
-              <li key={item.name} className="flex justify-between gap-2">
-                <span className="font-mono text-primary">{item.name}</span>
+              <li key={item.name} className="flex justify-between gap-2" title={item.description}>
+                <span className="font-mono text-primary">
+                  {`{{${node.data.name}.${item.name}}}`}
+                </span>
                 <span className="text-secondary">{item.type}</span>
               </li>
             ))}
           </ul>
+          <p className="mt-1 text-[11px] text-secondary">
+            供下游节点引用的变量，与连出的线段数量无关
+            {operator?.constraints?.outputsFromParam ? '；在上方字段定义里新增字段即可增加变量' : ''}。
+          </p>
         </div>
       ) : null}
 

@@ -62,7 +62,8 @@ function startNodesOf(nodes: FlowNode[]): FlowNode[] {
   })
 }
 
-export function getNodeOutputs(node: FlowNode): VariableDef[] {
+/** 节点向下游暴露的输出变量：算子静态 `outputs`，再并入 `outputsFromParam` 参数里声明的字段（同名以声明为准）。 */
+export function getNodeOutputs(node: Pick<FlowNode, 'data'>): VariableDef[] {
   if (!hasOperator(node.data.label)) return []
   const operator = getOperator(node.data.label)
   const fromParam = operator.constraints?.outputsFromParam
