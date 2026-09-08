@@ -1,6 +1,6 @@
 import dagre from '@dagrejs/dagre'
 import type { FlowEdge, FlowNode } from '../types'
-import { getNodeBoxSize } from './containers'
+import { CONTAINER_PORT_GUTTER, getNodeBoxSize } from './containers'
 
 const FALLBACK_WIDTH = 240
 const FALLBACK_HEIGHT = 80
@@ -92,7 +92,7 @@ export function computeAutoLayout(nodes: FlowNode[], edges: FlowEdge[]): LayoutR
       maxBottom = Math.max(maxBottom, y + box.height)
     }
     sizes[parentId] = {
-      width: Math.max(CONTAINER_MIN_WIDTH, Math.ceil(maxRight + CONTAINER_PADDING_X)),
+      width: Math.max(CONTAINER_MIN_WIDTH, Math.ceil(maxRight + CONTAINER_PORT_GUTTER)),
       height: Math.max(CONTAINER_MIN_HEIGHT, Math.ceil(maxBottom + CONTAINER_PADDING_BOTTOM))
     }
   }

@@ -123,6 +123,17 @@ body,
     linear-gradient(var(--bg-base), var(--bg-base)) center / 2px 6px no-repeat;
 }
 
+/* + 出口加大热区并压过容器内子节点，避免用久了被盖住拉不出线。 */
+.react-flow__handle.orchestrator-handle-new {
+  width: 22px;
+  height: 22px;
+  z-index: 1001;
+}
+
+.react-flow__node-containerNode .orchestrator-port-hit {
+  z-index: 1001;
+}
+
 .react-flow__handle.orchestrator-handle-reserved {
   opacity: 0;
   pointer-events: none;

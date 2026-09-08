@@ -17,6 +17,7 @@ import {
   minContainerSizeForChildren,
   nextNodeName,
   onlyInsideContainerToast,
+  planClampChildInParent,
   planKeepInsideContainer,
   resolveParentAfterDrag,
   stripRuntimeNode
@@ -112,7 +113,7 @@ describe('minContainerSizeForChildren', () => {
       height: 80
     })
     const size = minContainerSizeForChildren('loop', [loop, child])
-    expect(size.width).toBeGreaterThanOrEqual(400 + 240 + 16)
+    expect(size.width).toBeGreaterThanOrEqual(400 + 240 + 28)
     expect(size.height).toBeGreaterThanOrEqual(200 + 80 + 16)
   })
 })
@@ -206,11 +207,11 @@ describe('onlyInsideContainer drag (break)', () => {
       width: 88,
       height: 44
     })
-    expect(clampPositionInsideParent(brk, box)).toEqual({ x: 312, y: 256 })
+    expect(clampPositionInsideParent(brk, box)).toEqual({ x: 284, y: 256 })
     const keep = planKeepInsideContainer(brk, [box, brk])
     expect(keep).toEqual({
       parentId: 'loop',
-      position: { x: 312, y: 256 },
+      position: { x: 284, y: 256 },
       toast: onlyInsideContainerToast(brk)
     })
     expect(keep?.toast).toBe('Break 只能放在循环容器内')
@@ -225,6 +226,40 @@ describe('onlyInsideContainer drag (break)', () => {
       height: 44
     })
     expect(planKeepInsideContainer(brk, [box, brk])).toBeNull()
+  })
+})
+
+describe('planClampChildInParent', () => {
+  const box = node('loop', 'foreach', {
+    type: 'containerNode',
+    position: { x: 0, y: 0 },
+    width: 400,
+    height: 300
+  })
+
+  it('pulls a child off the container source ports', () => {
+    const inner = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 200, y: 80 },
+      width: 240,
+      height: 80
+    })
+    expect(planClampChildInParent(inner, [box, inner])).toEqual({
+      parentId: 'loop',
+      position: { x: 132, y: 80 }
+    })
+  })
+
+  it('leaves a child that already clears the port gutter', () => {
+    const inner = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 40, y: 80 },
+      width: 240,
+      height: 80
+    })
+    expect(planClampChildInParent(inner, [box, inner])).toBeNull()
   })
 })
 

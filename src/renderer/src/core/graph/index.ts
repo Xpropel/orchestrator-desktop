@@ -16,11 +16,13 @@ export {
   sameContainerBoundary
 } from './connection'
 export {
+  CONTAINER_CHILD_PAD,
   CONTAINER_DEFAULT_HEIGHT,
   CONTAINER_DEFAULT_WIDTH,
   CONTAINER_DROP_OVERLAP,
   CONTAINER_MIN_HEIGHT,
   CONTAINER_MIN_WIDTH,
+  CONTAINER_PORT_GUTTER,
   LOOP_START_POSITION,
   type NodeBox,
   collectDescendantIds,
@@ -30,6 +32,7 @@ export {
   findNonOverlappingPosition,
   resolveParentAfterDrag,
   clampPositionInsideParent,
+  planClampChildInParent,
   mustRemainInsideContainer,
   onlyInsideContainerToast,
   planKeepInsideContainer,

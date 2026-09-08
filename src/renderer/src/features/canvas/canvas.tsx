@@ -31,6 +31,7 @@ import {
   isProtectedNode,
   isStartNode,
   isValidFlowConnection,
+  planClampChildInParent,
   planKeepInsideContainer,
   resolveParentAfterDrag
 } from '@/core/graph'
@@ -334,6 +335,11 @@ function FlowCanvas(): JSX.Element {
       if (keep) {
         useFlowStore.getState().setNodeParent(latest.id, keep.parentId, keep.position)
         useUiStore.getState().showToast(keep.toast)
+        return
+      }
+      const clamped = planClampChildInParent(latest, current)
+      if (clamped) {
+        useFlowStore.getState().setNodeParent(latest.id, clamped.parentId, clamped.position)
       }
     },
     [screenToFlowPosition]

@@ -136,7 +136,9 @@ export function getNodeAbsoluteBox(node: FlowNode, nodes: FlowNode[]): NodeBox {
   return { x: position.x, y: position.y, width, height }
 }
 
-const CONTAINER_CHILD_PAD = 16
+export const CONTAINER_CHILD_PAD = 16
+/** 右侧留给母组件出口 / + 号，避免子节点盖住拉线。 */
+export const CONTAINER_PORT_GUTTER = 28
 
 /** 容器要包住直接子节点时的最小尺寸（相对坐标 + 子盒子 + 内边距）。 */
 export function minContainerSizeForChildren(
@@ -148,7 +150,7 @@ export function minContainerSizeForChildren(
   for (const child of nodes) {
     if (child.parentId !== containerId) continue
     const size = getNodeBoxSize(child)
-    width = Math.max(width, Math.ceil(child.position.x + size.width + CONTAINER_CHILD_PAD))
+    width = Math.max(width, Math.ceil(child.position.x + size.width + CONTAINER_PORT_GUTTER))
     height = Math.max(height, Math.ceil(child.position.y + size.height + CONTAINER_CHILD_PAD))
   }
   return { width, height }
@@ -258,7 +260,7 @@ export function onlyInsideContainerToast(node: FlowNode): string {
 export function clampPositionInsideParent(node: FlowNode, parent: FlowNode): XYPosition {
   const parentSize = getNodeBoxSize(parent)
   const childSize = getNodeBoxSize(node)
-  const maxX = Math.max(0, parentSize.width - childSize.width)
+  const maxX = Math.max(0, parentSize.width - childSize.width - CONTAINER_PORT_GUTTER)
   const maxY = Math.max(0, parentSize.height - childSize.height)
   return {
     x: Math.min(Math.max(0, node.position.x), maxX),
@@ -277,6 +279,19 @@ export function planKeepInsideContainer(
   const position = clampPositionInsideParent(node, parent)
   if (position.x === node.position.x && position.y === node.position.y) return null
   return { parentId: parent.id, position, toast: onlyInsideContainerToast(node) }
+}
+
+/** 普通子节点拖完后若压到右侧端口带，钳回空隙内。 */
+export function planClampChildInParent(
+  node: FlowNode,
+  nodes: FlowNode[]
+): { parentId: string; position: XYPosition } | null {
+  if (!node.parentId) return null
+  const parent = nodes.find((item) => item.id === node.parentId)
+  if (!parent || !isContainerNode(parent)) return null
+  const position = clampPositionInsideParent(node, parent)
+  if (position.x === node.position.x && position.y === node.position.y) return null
+  return { parentId: parent.id, position }
 }
 
 /** 拖放结束后是否改归属。返回 null 表示保持现状。指针优先，重叠兜底。 */
