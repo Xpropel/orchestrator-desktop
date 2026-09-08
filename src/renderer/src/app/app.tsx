@@ -26,7 +26,6 @@ export default function App(): JSX.Element {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-base text-primary">
-      <Toolbar />
       <div className="flex min-h-0 flex-1">
         <div className="relative flex h-full shrink-0">
           <Sidebar onAddOperator={addAtViewportCenter} />
@@ -34,6 +33,7 @@ export default function App(): JSX.Element {
         </div>
         <main className="relative min-w-0 flex-1">
           <Canvas />
+          <Toolbar />
           <FloatingInspector />
         </main>
       </div>

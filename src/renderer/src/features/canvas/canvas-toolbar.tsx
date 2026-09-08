@@ -15,7 +15,7 @@ export const CanvasToolbar = memo(function CanvasToolbar(): JSX.Element {
   const { addAtViewportCenter } = useAddNode()
 
   return (
-    <div className="absolute left-3 top-3 z-10 flex items-center gap-0.5 rounded-md border border-border bg-panel/95 p-0.5 shadow-lg backdrop-blur">
+    <div className="absolute left-3 top-toolbar z-10 mt-1 flex items-center gap-0.5 rounded-md border border-border bg-panel/95 p-0.5 shadow-lg backdrop-blur">
       <IconButton title={labeledShortcut('undo')} disabled={!canUndo} onClick={undo}>
         <Undo2 className="h-3.5 w-3.5" />
       </IconButton>

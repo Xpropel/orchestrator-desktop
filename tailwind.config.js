@@ -12,8 +12,8 @@ module.exports = {
         secondary: 'var(--text-secondary)',
         accent: 'var(--accent)'
       },
-      height: {
-        toolbar: '48px'
+      spacing: {
+        toolbar: '36px'
       }
     }
   },

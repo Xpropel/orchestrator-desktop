@@ -263,7 +263,7 @@ export function FloatingInspector(): JSX.Element {
   }, [closeInspector])
 
   return (
-    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+    <div ref={overlayRef} className="pointer-events-none absolute inset-x-0 bottom-0 top-toolbar z-20 overflow-hidden">
       {!open ? (
         <button
           type="button"

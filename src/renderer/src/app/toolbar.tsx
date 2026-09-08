@@ -51,8 +51,9 @@ export function Toolbar(): JSX.Element {
   }
 
   return (
-    <header className="flex h-toolbar shrink-0 items-center justify-between gap-3 border-b border-border bg-panel px-3">
-      <div className="flex min-w-0 items-center gap-1.5">
+    // 悬浮在画布顶部、背景透明；三组之间的空白不拦截指针，画布仍可从那里拖动。
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-toolbar items-center justify-between gap-2 px-2">
+      <div className="pointer-events-auto flex min-w-0 items-center gap-0.5">
         <ToolButton onClick={() => void newFlow()}>
           <FilePlus className="h-3.5 w-3.5" />
           {ACTION_LABEL.new}
@@ -65,12 +66,14 @@ export function Toolbar(): JSX.Element {
           {isElectron() ? <RecentFilesMenu /> : null}
         </div>
         <ExamplesMenu />
+        <span className="mx-1 h-3.5 w-px bg-border" />
         <ToolButton onClick={() => void saveFlow()}>
           <Save className="h-3.5 w-3.5" />
           {ACTION_LABEL.save}
         </ToolButton>
         <ToolButton onClick={() => void saveFlowAs()}>{ACTION_LABEL.saveAs}</ToolButton>
         <AutosaveMenu />
+        <span className="mx-1 h-3.5 w-px bg-border" />
         <ToolButton onClick={exportJson}>
           <Download className="h-3.5 w-3.5" />
           {ACTION_LABEL.exportJson}
@@ -81,11 +84,11 @@ export function Toolbar(): JSX.Element {
         </ToolButton>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col items-center">
+      <div className="pointer-events-auto flex min-w-0 flex-1 items-center justify-center gap-2 text-[11px] text-secondary">
         {editingTitle ? (
           <Input
             autoFocus
-            className="h-7 max-w-[240px] text-center text-xs"
+            className="h-6 max-w-[240px] text-center text-xs"
             value={titleDraft}
             onChange={(event) => setTitleDraft(event.target.value)}
             onBlur={commitTitle}
@@ -103,29 +106,25 @@ export function Toolbar(): JSX.Element {
         ) : (
           <button
             type="button"
-            className="max-w-[280px] truncate text-sm font-medium text-primary hover:text-accent"
-            title="点击编辑标题"
+            className="max-w-[280px] truncate text-[13px] font-medium text-primary hover:text-accent"
+            title={filePath ? `${filePath}（点击编辑标题）` : '点击编辑标题'}
             onClick={() => {
               setTitleDraft(title)
               setEditingTitle(true)
             }}
           >
             {title}
-            {dirty ? <span className="ml-1 text-accent">*</span> : null}
+            {dirty ? <span className="ml-0.5 text-accent">*</span> : null}
           </button>
         )}
-        <p className="max-w-[320px] truncate text-[11px] text-secondary" title={filePath ?? title}>
-          {fileLabel(filePath, title)}
-          {dirty ? <span className="ml-0.5 text-accent">*</span> : null}
-          {lastAutosaveAt ? (
-            <span className="ml-1.5 text-secondary">自动保存于 {formatClock(lastAutosaveAt)}</span>
-          ) : null}
-        </p>
+        {filePath ? <span className="hidden max-w-[220px] truncate lg:inline">{fileLabel(filePath, title)}</span> : null}
+        {lastAutosaveAt ? <span className="hidden xl:inline">自动保存 {formatClock(lastAutosaveAt)}</span> : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-secondary">
-        <span>
-          {nodeCount} 节点 · {edgeCount} 边</span>
+      <div className="pointer-events-auto flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-secondary">
+        <span className="px-1">
+          {nodeCount} 节点 · {edgeCount} 边
+        </span>
         <ToolButton
           aria-label="问题面板"
           onClick={toggleIssues}

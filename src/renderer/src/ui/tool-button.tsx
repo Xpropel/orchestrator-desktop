@@ -21,7 +21,7 @@ export function ToolButton({
       data-testid={testId}
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-primary',
+        'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs text-primary',
         'hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
         active && 'bg-elevated text-accent'
       )}

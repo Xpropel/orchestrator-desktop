@@ -45,7 +45,7 @@ export const Sidebar = memo(function Sidebar({
       data-testid="operator-sidebar"
       className="flex h-full w-[200px] shrink-0 flex-col border-r border-border bg-panel"
     >
-      <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-secondary">
+      <div className="flex h-toolbar shrink-0 items-center border-b border-border px-3 text-xs font-medium uppercase tracking-wide text-secondary">
         组件
       </div>
       <div className="border-b border-border px-2 py-2">
