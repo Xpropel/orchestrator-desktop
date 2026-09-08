@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+:root[data-theme='dark'] {
+  --bg-base: #0d1117;
+  --bg-panel: #161b22;
+  --bg-elevated: #21262d;
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --accent: #58a6ff;
+}
+
+:root[data-theme='light'] {
+  --bg-base: #f6f8fa;
+  --bg-panel: #ffffff;
+  --bg-elevated: #eef1f4;
+  --border: #d0d7de;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --accent: #2563eb;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family:
+    'Segoe UI',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.react-flow {
+  --xy-background-color: var(--bg-base);
+  --xy-node-background-color: var(--bg-elevated);
+  --xy-node-color: var(--text-primary);
+  --xy-node-border: 1px solid var(--border);
+  --xy-controls-button-background-color: var(--bg-elevated);
+  --xy-controls-button-color: var(--text-primary);
+  --xy-controls-button-border-color: var(--border);
+  --xy-attribution-background-color: transparent;
+  --xy-attribution-color: var(--text-secondary);
+  --xy-edge-stroke: #6e7681;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-panel) !important;
+}
+
+.react-flow__minimap {
+  background-color: var(--bg-panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(13, 17, 23, 0.72);
+}
+
+.react-flow__handle.orchestrator-handle {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  border-style: solid;
+  transition:
+    scale 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+/* React Flow 用 transform: translate(±50%, -50%) 把 handle 挂到节点边缘，
+   把缩放原点挪到平移后的圆心，hover 放大时圆心才纹丝不动。 */
+.react-flow__handle.orchestrator-handle.react-flow__handle-right {
+  transform-origin: 100% 0;
+}
+
+.react-flow__handle.orchestrator-handle.react-flow__handle-left {
+  transform-origin: 0 0;
+}
+
+.react-flow__handle.orchestrator-handle-source {
+  background: var(--accent);
+  border-color: var(--bg-base);
+}
+
+.react-flow__handle.orchestrator-handle-target {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+}
+
+/* 原地放大 15% + 一圈光晕：只用 scale / box-shadow，不碰 transform，
+   否则会覆盖 React Flow 的 translate 让小球横向跳一格。 */
+.react-flow__handle.orchestrator-handle:hover {
+  scale: 1.15;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+/* "+" 小球与其他端口同尺寸（12px），只多一个加号。
+   加号不用字形（字体基线/侧边距会让 "+" 偏离圆心），而是用两条渐变色条
+   以 background-position: center 画在 2px 边框内侧的 8×8 区域正中。 */
+.react-flow__handle.orchestrator-handle-new::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--bg-base), var(--bg-base)) center / 6px 2px no-repeat,
+    linear-gradient(var(--bg-base), var(--bg-base)) center / 2px 6px no-repeat;
+}
+
+.react-flow__handle.orchestrator-handle-reserved {
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  border-width: 0;
+}
+
+.react-flow__handle.orchestrator-handle-occupied {
+  cursor: grab;
+  pointer-events: none;
+}
+
+.react-flow__handle.orchestrator-handle-occupied-active {
+  cursor: grabbing;
+  z-index: 5;
+}
+
+.orchestrator-port-hit {
+  position: absolute;
+  right: 0;
+  z-index: 8;
+  width: 20px;
+  height: 20px;
+  transform: translate(50%, -50%);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.orchestrator-port-hit-active {
+  cursor: grabbing;
+}
+
+.orchestrator-card-selected {
+  border-color: var(--accent) !important;
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:root[data-theme='light'] .react-flow__minimap-mask {
+  fill: rgba(246, 248, 250, 0.72);
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent);
+}
+
+.react-flow__connection-line {
+  stroke: var(--accent);
+}
+
+.react-flow__node-toolbar {
+  z-index: 20;
+}
+
+.react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border-color: var(--accent);
+  background: var(--bg-panel);
+}

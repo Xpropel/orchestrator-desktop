@@ -1,0 +1,142 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "begin",
+        "type": "beginNode",
+        "position": { "x": 50, "y": 200 },
+        "data": {
+          "label": "Begin",
+          "name": "begin",
+          "form": { "prologue": "hello" }
+        }
+      },
+      {
+        "id": "Switch:sw01aaaa",
+        "type": "switchNode",
+        "position": { "x": 280, "y": 160 },
+        "data": {
+          "label": "Switch",
+          "name": "Switch_1",
+          "form": {
+            "conditions": [
+              {
+                "logical_operator": "and",
+                "items": [
+                  { "cpn_id": "sys.query", "operator": "=", "value": "billing" }
+                ],
+                "to": ["Message:msg1bbbb"]
+              },
+              {
+                "logical_operator": "or",
+                "items": [
+                  { "cpn_id": "sys.query", "operator": "contains", "value": "help" }
+                ],
+                "to": ["Categorize:cat1cccc"]
+              }
+            ],
+            "end_cpn_ids": ["Wikipedia:wiki1ddd"]
+          }
+        }
+      },
+      {
+        "id": "Categorize:cat1cccc",
+        "type": "categorizeNode",
+        "position": { "x": 560, "y": 80 },
+        "data": {
+          "label": "Categorize",
+          "name": "Categorize_1",
+          "form": {
+            "query": "sys.query",
+            "items": [
+              {
+                "uuid": "cat-billing",
+                "name": "Billing",
+                "description": "payment issues"
+              },
+              {
+                "uuid": "cat-other",
+                "name": "Other",
+                "description": "everything else"
+              }
+            ],
+            "category_description": {
+              "Billing": { "description": "payment issues", "to": ["Message:msg1bbbb"] }
+            }
+          }
+        }
+      },
+      {
+        "id": "Message:msg1bbbb",
+        "type": "messageNode",
+        "position": { "x": 560, "y": 260 },
+        "data": {
+          "label": "Message",
+          "name": "Message_1",
+          "form": { "content": ["ok"] }
+        }
+      },
+      {
+        "id": "Wikipedia:wiki1ddd",
+        "type": "ragNode",
+        "position": { "x": 560, "y": 420 },
+        "data": {
+          "label": "Wikipedia",
+          "name": "Wikipedia_1",
+          "form": { "top_n": 10, "language": "en" }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e0",
+        "source": "begin",
+        "target": "Switch:sw01aaaa",
+        "sourceHandle": "start"
+      },
+      {
+        "id": "e1",
+        "source": "Switch:sw01aaaa",
+        "target": "Message:msg1bbbb",
+        "sourceHandle": "Case 1"
+      },
+      {
+        "id": "e2",
+        "source": "Switch:sw01aaaa",
+        "target": "Categorize:cat1cccc",
+        "sourceHandle": "Case 2"
+      },
+      {
+        "id": "e3",
+        "source": "Switch:sw01aaaa",
+        "target": "Wikipedia:wiki1ddd",
+        "sourceHandle": "end_cpn_ids"
+      },
+      {
+        "id": "e4",
+        "source": "Categorize:cat1cccc",
+        "target": "Message:msg1bbbb",
+        "sourceHandle": "cat-billing"
+      }
+    ]
+  },
+  "components": {
+    "begin": {
+      "obj": { "component_name": "Begin", "params": {} },
+      "downstream": ["Switch:sw01aaaa"],
+      "upstream": []
+    },
+    "Switch:sw01aaaa": {
+      "obj": { "component_name": "Switch", "params": {} },
+      "downstream": ["Message:msg1bbbb", "Categorize:cat1cccc", "Wikipedia:wiki1ddd"],
+      "upstream": ["begin"]
+    }
+  },
+  "globals": {
+    "sys.query": "",
+    "sys.user_id": ""
+  },
+  "history": [],
+  "path": [],
+  "retrieval": []
+}

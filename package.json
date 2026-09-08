@@ -1,0 +1,65 @@
+{
+  "name": "orchestrator-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent Electron desktop workflow orchestrator",
+  "main": "./out/main/index.js",
+  "author": "Xpropel",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Xpropel/orchestrator-desktop.git"
+  },
+  "homepage": "https://github.com/Xpropel/orchestrator-desktop#readme",
+  "bugs": "https://github.com/Xpropel/orchestrator-desktop/issues",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:web": "vite --config vite.config.web.ts",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "lint": "eslint src",
+    "icon": "node scripts/generate-icon.cjs",
+    "test": "vitest run",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "smoke": "electron-vite build && node scripts/run-smoke.cjs",
+    "smoke:examples": "electron-vite build && node scripts/run-smoke.cjs --examples",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
+    "@xyflow/react": "^12.8.2",
+    "clsx": "^2.1.1",
+    "immer": "^10.1.1",
+    "lucide-react": "^0.544.0",
+    "nanoid": "^5.1.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^5.0.2",
+    "autoprefixer": "^10.4.21",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "eslint": "^10.10.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.69.0",
+    "vite": "^7.1.5",
+    "vitest": "^5.0.0"
+  },
+  "allowScripts": {
+    "electron": true,
+    "electron-winstaller": true,
+    "esbuild": true
+  }
+}

@@ -1,0 +1,371 @@
+{
+  "version": 1,
+  "title": "循环容器：逐个抓取网页并总结",
+  "globals": {},
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "type": "startNode",
+        "position": {
+          "x": 60,
+          "y": 320
+        },
+        "data": {
+          "label": "start",
+          "name": "start",
+          "form": {
+            "inputs": [
+              {
+                "key": "urls",
+                "type": "array",
+                "required": true,
+                "description": "待抓取的网页地址列表"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "foreach:550g5lb0",
+        "type": "containerNode",
+        "position": {
+          "x": 340,
+          "y": 120
+        },
+        "data": {
+          "label": "foreach",
+          "name": "Loop_1",
+          "form": {
+            "items": "{{start.urls}}",
+            "maxIterations": 20
+          },
+          "description": "逐个抓取并总结"
+        },
+        "width": 900,
+        "height": 420,
+        "style": {
+          "width": 900,
+          "height": 420
+        }
+      },
+      {
+        "id": "foreach:550g5lb0:start",
+        "type": "loopStartNode",
+        "position": {
+          "x": 24,
+          "y": 56
+        },
+        "data": {
+          "label": "loop-start",
+          "name": "LoopStart_1",
+          "form": {}
+        },
+        "parentId": "foreach:550g5lb0"
+      },
+      {
+        "id": "http:661h2r26",
+        "type": "taskNode",
+        "position": {
+          "x": 120,
+          "y": 120
+        },
+        "data": {
+          "label": "http",
+          "name": "Http_1",
+          "form": {
+            "method": "GET",
+            "url": "{{Loop_1.item}}",
+            "headers": {},
+            "body": ""
+          }
+        },
+        "parentId": "foreach:550g5lb0"
+      },
+      {
+        "id": "if:772ddxyy",
+        "type": "branchNode",
+        "position": {
+          "x": 400,
+          "y": 120
+        },
+        "data": {
+          "label": "if",
+          "name": "If_1",
+          "form": {
+            "cases": [
+              {
+                "id": "ok",
+                "label": "成功",
+                "expression": "{{Http_1.status}} == 200"
+              }
+            ]
+          },
+          "description": "非 200 直接跳出循环"
+        },
+        "parentId": "foreach:550g5lb0"
+      },
+      {
+        "id": "agent:8839oy34",
+        "type": "taskNode",
+        "position": {
+          "x": 660,
+          "y": 80
+        },
+        "data": {
+          "label": "agent",
+          "name": "Agent_1",
+          "form": {
+            "session": "",
+            "model": "qwen-plus",
+            "system": "",
+            "prompt": "用一句话总结这个网页（第 {{Loop_1.index}} 个）：\n{{Http_1.body}}",
+            "tools": [],
+            "maxSteps": 1
+          }
+        },
+        "parentId": "foreach:550g5lb0"
+      },
+      {
+        "id": "break:9945z4ua",
+        "type": "breakNode",
+        "position": {
+          "x": 660,
+          "y": 280
+        },
+        "data": {
+          "label": "break",
+          "name": "Break_1",
+          "form": {}
+        },
+        "parentId": "foreach:550g5lb0"
+      },
+      {
+        "id": "message:aa51aalg",
+        "type": "taskNode",
+        "position": {
+          "x": 1320,
+          "y": 320
+        },
+        "data": {
+          "label": "message",
+          "name": "Message_1",
+          "form": {
+            "content": "{{Loop_1.results}}"
+          }
+        }
+      },
+      {
+        "id": "end:bb62c2cm",
+        "type": "endNode",
+        "position": {
+          "x": 1600,
+          "y": 320
+        },
+        "data": {
+          "label": "end",
+          "name": "End",
+          "form": {}
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e:start->foreach:550g5lb0:start",
+        "source": "start",
+        "target": "foreach:550g5lb0",
+        "sourceHandle": "start",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      },
+      {
+        "id": "e:foreach:550g5lb0:start->http:661h2r26:start",
+        "source": "foreach:550g5lb0:start",
+        "target": "http:661h2r26",
+        "sourceHandle": "start",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      },
+      {
+        "id": "e:http:661h2r26->if:772ddxyy:start",
+        "source": "http:661h2r26",
+        "target": "if:772ddxyy",
+        "sourceHandle": "start",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      },
+      {
+        "id": "e:if:772ddxyy->agent:8839oy34:ok",
+        "source": "if:772ddxyy",
+        "target": "agent:8839oy34",
+        "sourceHandle": "ok",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      },
+      {
+        "id": "e:if:772ddxyy->break:9945z4ua:else",
+        "source": "if:772ddxyy",
+        "target": "break:9945z4ua",
+        "sourceHandle": "else",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      },
+      {
+        "id": "e:foreach:550g5lb0->message:aa51aalg:start",
+        "source": "foreach:550g5lb0",
+        "target": "message:aa51aalg",
+        "sourceHandle": "start",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      },
+      {
+        "id": "e:message:aa51aalg->end:bb62c2cm:start",
+        "source": "message:aa51aalg",
+        "target": "end:bb62c2cm",
+        "sourceHandle": "start",
+        "targetHandle": "end",
+        "type": "buttonEdge"
+      }
+    ]
+  },
+  "components": {
+    "start": {
+      "obj": {
+        "component_name": "start",
+        "params": {
+          "inputs": [
+            {
+              "key": "urls",
+              "type": "array",
+              "required": true,
+              "description": "待抓取的网页地址列表"
+            }
+          ]
+        }
+      },
+      "upstream": [],
+      "downstream": [
+        "foreach:550g5lb0"
+      ]
+    },
+    "foreach:550g5lb0": {
+      "obj": {
+        "component_name": "foreach",
+        "params": {
+          "items": "{{start.urls}}",
+          "maxIterations": 20
+        }
+      },
+      "upstream": [
+        "start"
+      ],
+      "downstream": [
+        "message:aa51aalg"
+      ]
+    },
+    "foreach:550g5lb0:start": {
+      "obj": {
+        "component_name": "loop-start",
+        "params": {}
+      },
+      "upstream": [],
+      "downstream": [
+        "http:661h2r26"
+      ],
+      "parent_id": "foreach:550g5lb0"
+    },
+    "http:661h2r26": {
+      "obj": {
+        "component_name": "http",
+        "params": {
+          "method": "GET",
+          "url": "{{Loop_1.item}}",
+          "headers": {},
+          "body": ""
+        }
+      },
+      "upstream": [
+        "foreach:550g5lb0:start"
+      ],
+      "downstream": [
+        "if:772ddxyy"
+      ],
+      "parent_id": "foreach:550g5lb0"
+    },
+    "if:772ddxyy": {
+      "obj": {
+        "component_name": "if",
+        "params": {
+          "cases": [
+            {
+              "id": "ok",
+              "label": "成功",
+              "expression": "{{Http_1.status}} == 200"
+            }
+          ]
+        }
+      },
+      "upstream": [
+        "http:661h2r26"
+      ],
+      "downstream": [
+        "agent:8839oy34",
+        "break:9945z4ua"
+      ],
+      "parent_id": "foreach:550g5lb0"
+    },
+    "agent:8839oy34": {
+      "obj": {
+        "component_name": "agent",
+        "params": {
+          "session": "",
+          "model": "qwen-plus",
+          "system": "",
+          "prompt": "用一句话总结这个网页（第 {{Loop_1.index}} 个）：\n{{Http_1.body}}",
+          "tools": [],
+          "maxSteps": 1
+        }
+      },
+      "upstream": [
+        "if:772ddxyy"
+      ],
+      "downstream": [],
+      "parent_id": "foreach:550g5lb0"
+    },
+    "break:9945z4ua": {
+      "obj": {
+        "component_name": "break",
+        "params": {}
+      },
+      "upstream": [
+        "if:772ddxyy"
+      ],
+      "downstream": [],
+      "parent_id": "foreach:550g5lb0"
+    },
+    "message:aa51aalg": {
+      "obj": {
+        "component_name": "message",
+        "params": {
+          "content": "{{Loop_1.results}}"
+        }
+      },
+      "upstream": [
+        "foreach:550g5lb0"
+      ],
+      "downstream": [
+        "end:bb62c2cm"
+      ]
+    },
+    "end:bb62c2cm": {
+      "obj": {
+        "component_name": "end",
+        "params": {}
+      },
+      "upstream": [
+        "message:aa51aalg"
+      ],
+      "downstream": []
+    }
+  }
+}

@@ -1,0 +1,28 @@
+appId: com.ragflow.orchestrator-desktop
+productName: Orchestrator Desktop
+directories:
+  output: dist
+icon: build/icon.png
+files:
+  - out/**/*
+  - examples/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - nsis
+    - portable
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: Orchestrator Desktop
+  artifactName: ${productName}-${version}-setup.${ext}
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+mac:
+  target:
+    - dmg
+linux:
+  target:
+    - AppImage
+npmRebuild: false

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "foreach-http-summary",
+    "file": "foreach-http-summary.flow.json",
+    "title": "循环容器：逐个抓取网页并总结",
+    "description": "foreach 容器内部 loop-start → http → if 分支 → agent / break，容器外用 results 聚合输出。"
+  }
+]
