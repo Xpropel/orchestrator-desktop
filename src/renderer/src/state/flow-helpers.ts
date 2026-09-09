@@ -8,7 +8,8 @@ import {
   remapClipboard,
   snapshotKeyOf,
   type ClipboardGraph,
-  type GraphSnapshot
+  type GraphSnapshot,
+  type RemapClipboardOptions
 } from '@/core/graph'
 import { renameReferencesInGraph } from '@/core/variables'
 import type { FlowEdge, FlowNode } from '@/core/types'
@@ -108,6 +109,7 @@ export function syncDirtyFromSnapshot(state: {
     snapshotKeyOf(snapshotOf(state.nodes, state.edges, state.title, state.globals)) !== state.savedSnapshotKey
 }
 
+/** @returns 是否写入了新的历史帧（与栈顶相同则 false，避免空拖拽把 historyAmendable 留真）。 */
 export function pushSnapshot(state: {
   nodes: FlowNode[]
   edges: FlowEdge[]
@@ -116,16 +118,19 @@ export function pushSnapshot(state: {
   selectedNodeId?: string | null
   historyPast: GraphSnapshot[]
   historyFuture: GraphSnapshot[]
-}): void {
+  historyAmendable?: boolean
+}): boolean {
   const snap = snapshotOf(state.nodes, state.edges, state.title, state.globals)
   snap.selectedNodeId = state.selectedNodeId ?? null
   const last = state.historyPast[state.historyPast.length - 1]
-  if (last && graphsEqual(last, snap)) return
+  if (last && graphsEqual(last, snap)) return false
   state.historyPast.push(snap)
   if (state.historyPast.length > MAX_HISTORY) {
     state.historyPast.shift()
   }
   state.historyFuture = []
+  state.historyAmendable = false
+  return true
 }
 
 export function replaceTopSnapshot(state: {
@@ -136,6 +141,7 @@ export function replaceTopSnapshot(state: {
   selectedNodeId: string | null
   historyPast: GraphSnapshot[]
   historyFuture: GraphSnapshot[]
+  historyAmendable?: boolean
 }): void {
   const snap = snapshotOf(state.nodes, state.edges, state.title, state.globals)
   snap.selectedNodeId = state.selectedNodeId
@@ -145,6 +151,7 @@ export function replaceTopSnapshot(state: {
     state.historyPast[state.historyPast.length - 1] = snap
   }
   state.historyFuture = []
+  state.historyAmendable = false
 }
 
 export function pruneDraft(state: { nodes: FlowNode[]; edges: FlowEdge[] }): boolean {
@@ -183,9 +190,10 @@ export function applyClipboard(
     historyPast: GraphSnapshot[]
     historyFuture: GraphSnapshot[]
   },
-  payload: ClipboardGraph
+  payload: ClipboardGraph,
+  options?: RemapClipboardOptions
 ): void {
-  const remapped = remapClipboard(payload, unwrap(state.nodes), { x: 40, y: 40 })
+  const remapped = remapClipboard(payload, unwrap(state.nodes), { x: 40, y: 40 }, options)
   if (remapped.nodes.length === 0) return
   state.nodes.forEach((node) => {
     node.selected = false

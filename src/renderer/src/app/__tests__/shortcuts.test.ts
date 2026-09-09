@@ -37,7 +37,13 @@ describe('resolveBrowserShortcut', () => {
   it('does not take over edit keys inside a text field', () => {
     const spy = vi.spyOn(textTarget, 'isTextInputTarget').mockReturnValue(true)
     expect(resolveBrowserShortcut(keyEvent({ key: 'z', ctrlKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'z', metaKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'c', ctrlKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'v', metaKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'd', ctrlKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'd', metaKey: true }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'Delete' }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'Backspace' }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'n', ctrlKey: true }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'o', ctrlKey: true }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'i', ctrlKey: true }))).toBeNull()

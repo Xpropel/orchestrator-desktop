@@ -104,6 +104,7 @@ describe('validateFlow section 5', () => {
     const msg = node('m', 'message', 'Msg_1', { content: '{{Ghost.text}}' })
     expect(codes([start(), msg], [edge('s', 'm')], 'UNKNOWN_REFERENCE')).toBe(1)
     expect(codes([start(), node('m', 'message', 'Msg_1', { content: '{{sys.query}}' })], [edge('s', 'm')], 'UNKNOWN_REFERENCE')).toBe(0)
+    expect(codes([start(), node('m2', 'message', 'Msg_2', { content: '{{sys.files}} {{sys.now}}' })], [edge('s', 'm2')], 'UNKNOWN_REFERENCE')).toBe(0)
   })
 
   it('REFERENCE_NOT_UPSTREAM', () => {
@@ -154,6 +155,9 @@ describe('validateFlow section 5', () => {
     const filled = node('c2', 'foreach', 'For_2', { items: '{{sys.files}}' })
     const child = node('n', 'message', 'Msg_1', { content: 'x' }, { parentId: 'c2' })
     expect(codes([start(), filled, child], [edge('s', 'c2')], 'EMPTY_CONTAINER')).toBe(0)
+    const onlyStart = node('c3', 'foreach', 'For_3', { items: '{{sys.files}}' }, { type: 'containerNode' })
+    const loopStart = node('c3:start', 'loop-start', 'LoopStart_1', {}, { type: 'loopStartNode', parentId: 'c3' })
+    expect(codes([start(), onlyStart, loopStart], [edge('s', 'c3')], 'EMPTY_CONTAINER')).toBe(1)
   })
 
   it('BREAK_OUTSIDE_LOOP', () => {
@@ -161,6 +165,20 @@ describe('validateFlow section 5', () => {
     const loop = node('c', 'foreach', 'For_1', { items: '{{sys.files}}' })
     const br = node('b', 'break', 'Break_1', {}, { parentId: 'c' })
     expect(codes([start(), loop, br], [edge('s', 'c')], 'BREAK_OUTSIDE_LOOP')).toBe(0)
+    const orphan = node('b2', 'break', 'Break_2', {}, { parentId: 'ghost' })
+    expect(codes([start(), orphan], [edge('s', 'b2')], 'BREAK_OUTSIDE_LOOP')).toBe(1)
+    const agent = node('a', 'agent', 'Agent_1', { prompt: 'p', model: 'm' })
+    const nested = node('b3', 'break', 'Break_3', {}, { parentId: 'a' })
+    expect(codes([start(), agent, nested], [edge('s', 'a')], 'BREAK_OUTSIDE_LOOP')).toBe(1)
+    const blank = node('b4', 'break', 'Break_4', {}, { parentId: '' })
+    expect(codes([start(), blank], [edge('s', 'b4')], 'BREAK_OUTSIDE_LOOP')).toBe(1)
+    const box = node('c2', 'foreach', 'For_2', { items: '{{sys.files}}' }, { type: 'containerNode' })
+    const loopStart = node('c2:start', 'loop-start', 'LoopStart_1', {}, { type: 'loopStartNode', parentId: 'c2' })
+    const underStart = node('b5', 'break', 'Break_5', {}, { parentId: 'c2:start' })
+    expect(codes([start(), box, loopStart, underStart], [edge('s', 'c2')], 'BREAK_OUTSIDE_LOOP')).toBe(1)
+    const whileLoop = node('w', 'while', 'While_1', { condition: 'true' })
+    const inWhile = node('b6', 'break', 'Break_6', {}, { parentId: 'w' })
+    expect(codes([start(), whileLoop, inWhile], [edge('s', 'w')], 'BREAK_OUTSIDE_LOOP')).toBe(0)
   })
 
   it('WHILE_NO_CONDITION', () => {
@@ -239,6 +257,13 @@ describe('validateFlow section 2.1', () => {
     expect(codes([start(), node('a', 'agent', 'Agent_1', { prompt: 'p' })], [edge('s', 'a')], 'AGENT_NO_MODEL')).toBe(1)
     expect(
       codes([start(), node('a', 'agent', 'Agent_1', { prompt: 'p', model: 'gpt' })], [edge('s', 'a')], 'AGENT_NO_MODEL')
+    ).toBe(0)
+    expect(
+      codes(
+        [start(), node('a', 'agent', 'Agent_1', { prompt: 'p', session: '{{sys.query}}' })],
+        [edge('s', 'a')],
+        'AGENT_NO_MODEL'
+      )
     ).toBe(0)
   })
 

@@ -32,7 +32,7 @@ export function loadFlowFromText(content: string, filePath: string | null): void
     filePath
   )
   // 换了文档，属性面板不能继续指着旧节点（哪怕新文档恰好有同名 id）。
-  useUiStore.getState().closeInspector()
+  useUiStore.getState().closeTransientUi()
 }
 
 function captureSavePayload(): { content: string; written: ReturnType<typeof snapshotOf> } {
@@ -67,7 +67,7 @@ export async function newFlow(): Promise<void> {
     return
   }
   useFlowStore.getState().resetToEmpty()
-  useUiStore.getState().closeInspector()
+  useUiStore.getState().closeTransientUi()
   void clearRecoverySnapshot()
 }
 

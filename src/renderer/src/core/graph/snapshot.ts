@@ -1,7 +1,14 @@
 import { deepClone } from '../clone'
 import type { FlowEdge, FlowNode } from '../types'
 
-export const NODE_RUNTIME_KEYS = ['selected', 'dragging', 'measured', 'resizing', 'positionAbsolute'] as const
+export const NODE_RUNTIME_KEYS = [
+  'selected',
+  'dragging',
+  'measured',
+  'resizing',
+  'positionAbsolute',
+  'extent'
+] as const
 export const EDGE_RUNTIME_KEYS = ['selected', 'dragging', 'measured'] as const
 
 export interface GraphSnapshot {

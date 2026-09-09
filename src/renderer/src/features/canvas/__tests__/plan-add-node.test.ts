@@ -1,5 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { createOperatorNode, createStartNode } from '@/core/graph'
+import {
+  CONTAINER_DEFAULT_WIDTH,
+  CONTAINER_PORT_GUTTER,
+  createOperatorNode,
+  createStartNode,
+  estimateNodeSize
+} from '@/core/graph'
 import { loadLibrary } from '@/core/library'
 import { planAddAtFlowPosition, planAddAtViewportCenter } from '../plan-add-node'
 
@@ -48,6 +54,21 @@ describe('planAddAtFlowPosition', () => {
     expect(inside.ok).toBe(true)
     if (!inside.ok) return
     expect(inside.node.parentId).toBe(box.id)
+    const agent = createOperatorNode('agent', { x: 400, y: 0 }, [start, box])
+    expect(planAddAtFlowPosition('break', { x: 80, y: 80 }, [start, agent], { parentId: agent.id })).toEqual({
+      ok: false,
+      toast: 'break 只能放在循环容器内'
+    })
+  })
+
+  it('does not nest while/foreach inside another container', () => {
+    const box = createOperatorNode('foreach', { x: 0, y: 0 }, [start])
+    const dropped = planAddAtFlowPosition('while', { x: 80, y: 80 }, [start, box])
+    expect(dropped.ok).toBe(true)
+    if (dropped.ok) expect(dropped.node.parentId).toBeUndefined()
+    const explicit = planAddAtFlowPosition('while', { x: 80, y: 80 }, [start, box], { parentId: box.id })
+    expect(explicit.ok).toBe(true)
+    if (explicit.ok) expect(explicit.node.parentId).toBeUndefined()
   })
 
   it('honors an explicit null parentId even when the point sits inside a container', () => {
@@ -64,6 +85,16 @@ describe('planAddAtFlowPosition', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.node.parentId).toBe(box.id)
+  })
+
+  it('clamps a task dropped near the container right edge away from the + handle', () => {
+    const box = createOperatorNode('foreach', { x: 0, y: 0 }, [start])
+    const result = planAddAtFlowPosition('agent', { x: 540, y: 160 }, [start, box])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.node.parentId).toBe(box.id)
+    const maxX = CONTAINER_DEFAULT_WIDTH - estimateNodeSize('agent').width - CONTAINER_PORT_GUTTER
+    expect(result.node.position.x).toBeLessThanOrEqual(maxX)
   })
 })
 

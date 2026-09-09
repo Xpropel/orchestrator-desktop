@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { FlowNode } from '@/core/types'
 import {
   dropLeavesContainer,
+  findNoteAtPoint,
   isIgnoredConnectTarget,
   isSourceOrAncestor,
   mergeNodeMetrics,
@@ -41,7 +42,12 @@ describe('pickDropTargetNode', () => {
     expect(pickDropTargetNode({ x: 160, y: 110 }, [note])).toBeNull()
   })
 
-  it('prefers a container child over the container', () => {
+  it('finds a note under the pointer even when pickDropTargetNode skips it', () => {
+    expect(findNoteAtPoint({ x: 160, y: 110 }, [note])?.id).toBe('note')
+    expect(findNoteAtPoint({ x: 10, y: 10 }, [note])).toBeNull()
+  })
+
+    it('prefers a container child over the container', () => {
     const box = node('loop', {
       type: 'containerNode',
       position: { x: 0, y: 0 },
@@ -57,6 +63,24 @@ describe('pickDropTargetNode', () => {
     })
     expect(pickDropTargetNode({ x: 80, y: 90 }, [box, child])?.id).toBe('child')
     expect(pickDropTargetNode({ x: 80, y: 90 }, [box, child], 'loop')?.id).toBe('child')
+  })
+
+  it('hits a child when the drop is on the protruding left target handle', () => {
+    const box = node('loop', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300,
+      data: { label: 'foreach', name: 'loop', form: {} }
+    })
+    const child = node('child', {
+      parentId: 'loop',
+      position: { x: 40, y: 60 },
+      width: 240,
+      height: 80
+    })
+    // 入口在节点左缘外侧；从母容器拉线时 RF 常把 toNode 报成容器本身。
+    expect(pickDropTargetNode({ x: 32, y: 100 }, [box, child], 'loop')?.id).toBe('child')
   })
 
   it('prefers the later sibling when two top-level boxes overlap', () => {
@@ -103,6 +127,28 @@ describe('pickDropTargetNode', () => {
 
     it('never returns the source itself', () => {
       expect(pickDropTargetNode({ x: 30, y: 60 }, [box, loopStart, sibling, outside], 'loop:start')).toBeNull()
+    })
+
+    it('does not let the pad steal a sibling across empty body', () => {
+      const above = node('above', {
+        parentId: 'loop',
+        position: { x: 40, y: 60 },
+        width: 240,
+        height: 80
+      })
+      const stacked = node('stacked', {
+        parentId: 'loop',
+        position: { x: 40, y: 180 },
+        width: 240,
+        height: 80
+      })
+      // above 底边 y=140；36px 全向垫片会吞掉缝里的 (160,155)，左侧垫片不应命中。
+      expect(pickDropTargetNode({ x: 160, y: 155 }, [box, loopStart, above, stacked, outside], 'stacked')).toBeNull()
+    })
+
+    it('does not let the pad steal an outside node from the source container body', () => {
+      const near = node('near', { position: { x: 420, y: 40 }, width: 240, height: 80 })
+      expect(pickDropTargetNode({ x: 390, y: 80 }, [box, loopStart, near], 'loop')).toBeNull()
     })
 
     it('does not treat loop-start as a connect target', () => {

@@ -23,17 +23,14 @@ import { OperatorPicker, type OperatorPickerMode } from '@/features/canvas/opera
 import { useAddNode } from '@/features/canvas/use-add-node'
 import { useClipboard } from '@/features/canvas/use-clipboard'
 import { runAutoLayout } from '@/features/canvas/run-auto-layout'
-import { planConnectEnd, planPickerConnect } from '@/features/canvas/plan-connect-end'
-import { nextSelectedIds, planNodeClick, selectionChangesFor } from '@/features/canvas/plan-node-click'
+import { planConnectEnd, planPickerConnect, resolveConnectEndPoint } from '@/features/canvas/plan-connect-end'
+import { nextSelectedIds, planNodeClick, selectedIdsOf, selectionChangesFor } from '@/features/canvas/plan-node-click'
 import {
   findContainingContainer,
   hasMatchingConnection,
   isProtectedNode,
-  isStartNode,
   isValidFlowConnection,
-  planClampChildInParent,
-  planKeepInsideContainer,
-  resolveParentAfterDrag
+  planDragParentChanges
 } from '@/core/graph'
 import { getOperator, hasOperator } from '@/core/registry'
 import { HANDLE_START, logicalHandleId } from '@/core/handles'
@@ -86,6 +83,17 @@ function clientPoint(event: MouseEvent | TouchEvent): { x: number; y: number } {
   return { x: mouse.clientX, y: mouse.clientY }
 }
 
+/** RF 的 flow 坐标有时落在便签盒外；屏幕盒命中则仍视为连到便签。 */
+function clientHitsNote(point: { x: number; y: number }): boolean {
+  for (const el of document.querySelectorAll('.react-flow__node-noteNode')) {
+    const rect = el.getBoundingClientRect()
+    if (point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom) {
+      return true
+    }
+  }
+  return false
+}
+
 function FlowCanvas(): JSX.Element {
   const nodes = useFlowStore((state) => state.nodes)
   const edges = useFlowStore((state) => state.edges)
@@ -111,13 +119,14 @@ function FlowCanvas(): JSX.Element {
   const nodesInitialized = useNodesInitialized()
   const [fitPending, setFitPending] = useState(false)
   const selectionAtPointerDown = useRef<string[]>([])
-  const applyingOwnSelect = useRef(false)
 
   useEffect(() => {
     if (viewportRequest === 0) {
       return
     }
     setFitPending(true)
+    setPicker(null)
+    setMenu(null)
   }, [viewportRequest])
 
   // 载入文档后节点尚未量测；React Flow 会把 fitView 挂起到首次 updateNodeInternals，
@@ -190,12 +199,26 @@ function FlowCanvas(): JSX.Element {
       if (!connectionState.fromNode) return
       if (connectionState.fromHandle?.type !== 'source') return
       const point = clientPoint(event)
-      const flowPos = screenToFlowPosition(point)
+      if (clientHitsNote(point)) {
+        useUiStore.getState().showToast('不能连接：便签不能连线')
+        return
+      }
       const from = connectionState.fromNode
+      const pointerFlow = screenToFlowPosition(point)
       const sourceHandle = logicalHandleId(connectionState.fromHandle?.id) ?? HANDLE_START
+      const toHandleNodeId =
+        typeof connectionState.toHandle?.nodeId === 'string'
+          ? connectionState.toHandle.nodeId
+          : null
       const state = useFlowStore.getState()
       const measured = mergeNodeMetrics(state.nodes, (getNodes() as CanvasNode[]).map(toFlowNode))
-      const plan = planConnectEnd({
+      const flowPos = resolveConnectEndPoint(connectionState.to, pointerFlow, measured, from.id)
+      const alreadyConnected = hasMatchingConnection(state.edges, {
+        source: from.id,
+        sourceHandle,
+        target: toHandleNodeId ?? connectionState.toNode?.id ?? null
+      })
+      const planInput = {
         point: flowPos,
         nodes: measured,
         edges: state.edges,
@@ -203,14 +226,12 @@ function FlowCanvas(): JSX.Element {
         sourceParentId: typeof from.parentId === 'string' ? from.parentId : null,
         sourceHandle,
         toNodeId: connectionState.toNode?.id,
+        toHandleNodeId,
         // isValid 只表示悬停看起来合法。从容器连到体内子节点时，React Flow
         // 常报 isValid 却不触发 onConnect；必须以仓库里是否已有这条边为准。
-        alreadyConnected: hasMatchingConnection(state.edges, {
-          source: from.id,
-          sourceHandle,
-          target: connectionState.toNode?.id ?? null
-        })
-      })
+        alreadyConnected
+      }
+      const plan = planConnectEnd(planInput)
       if (plan.kind === 'none') return
       if (plan.kind === 'toast') {
         useUiStore.getState().showToast(plan.message)
@@ -249,32 +270,17 @@ function FlowCanvas(): JSX.Element {
       const nextIds = nextSelectedIds(plan, selectionAtPointerDown.current)
       const changes = selectionChangesFor(useFlowStore.getState().nodes, nextIds)
       if (changes.length > 0) {
-        applyingOwnSelect.current = true
         useFlowStore.getState().onNodesChange(changes)
-        applyingOwnSelect.current = false
       }
     },
     [selectNode, openInspector]
   )
 
-  const handleNodesChange = useCallback<typeof onNodesChange>(
-    (changes) => {
-      if (!applyingOwnSelect.current && changes.some((change) => change.type === 'select')) {
-        selectionAtPointerDown.current = useFlowStore
-          .getState()
-          .nodes.filter((item) => item.selected)
-          .map((item) => item.id)
-      }
-      onNodesChange(changes)
-    },
-    [onNodesChange]
-  )
-
-  const onNodeMouseDown = useCallback((_event: ReactMouseEvent, _node: CanvasNode) => {
-    selectionAtPointerDown.current = useFlowStore
-      .getState()
-      .nodes.filter((item) => item.selected)
-      .map((item) => item.id)
+  // 只用 capture 阶段的选中快照。不要用 onNodeMouseDown：RF 会先独占选中，时序也不稳定。
+  const onCanvasMouseDownCapture = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (!(target instanceof Element) || !target.closest('.react-flow__node')) return
+    selectionAtPointerDown.current = selectedIdsOf(useFlowStore.getState().nodes)
   }, [])
 
   const onPaneClick = useCallback(() => {
@@ -310,14 +316,9 @@ function FlowCanvas(): JSX.Element {
   }, [])
 
   const onNodeDragStop = useCallback<OnNodeDrag<CanvasNode>>(
-    (event, node) => {
+    (event, node, dragged) => {
       const current = useFlowStore.getState().nodes
-      const flow = toFlowNode(node)
-      if (isStartNode(flow) || isProtectedNode(flow, current) || node.type === 'containerNode') {
-        return
-      }
       // React Flow 先派发最终 position change（dragging=false），再触发本回调，store 已是落点坐标。
-      const latest = current.find((item) => item.id === node.id) ?? toFlowNode(node)
       // 以指针落点判定归属（用户直觉），节点重叠面积兜底。触摸事件取最后一个触点。
       const point =
         'clientX' in event
@@ -326,21 +327,12 @@ function FlowCanvas(): JSX.Element {
             ? { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY }
             : null
       const pointer = point ? screenToFlowPosition(point) : undefined
-      const change = resolveParentAfterDrag(latest, current, pointer)
-      if (change) {
-        useFlowStore.getState().setNodeParent(latest.id, change.parentId, change.position)
-        return
-      }
-      const keep = planKeepInsideContainer(latest, current)
-      if (keep) {
-        useFlowStore.getState().setNodeParent(latest.id, keep.parentId, keep.position)
-        useUiStore.getState().showToast(keep.toast)
-        return
-      }
-      const clamped = planClampChildInParent(latest, current)
-      if (clamped) {
-        useFlowStore.getState().setNodeParent(latest.id, clamped.parentId, clamped.position)
-      }
+      const batch = dragged.length > 0 ? dragged : [node]
+      const changes = planDragParentChanges(batch.map(toFlowNode), current, pointer)
+      if (changes.length === 0) return
+      useFlowStore.getState().setNodeParents(changes)
+      const toast = changes.find((item) => item.toast)?.toast
+      if (toast) useUiStore.getState().showToast(toast)
     },
     [screenToFlowPosition]
   )
@@ -369,11 +361,11 @@ function FlowCanvas(): JSX.Element {
   const canvasEdges = useMemo(() => toCanvasEdges(edges), [edges])
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full" onMouseDownCapture={onCanvasMouseDownCapture}>
       <ReactFlow<CanvasNode, CanvasEdge>
         nodes={canvasNodes}
         edges={canvasEdges}
-        onNodesChange={handleNodesChange}
+        onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
@@ -394,7 +386,6 @@ function FlowCanvas(): JSX.Element {
         selectionOnDrag
         {...canvasPointerBehavior(fileApi.platform)}
         onNodeClick={onNodeClick}
-        onNodeMouseDown={onNodeMouseDown}
         onPaneClick={onPaneClick}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}

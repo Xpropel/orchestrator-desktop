@@ -6,6 +6,7 @@ import {
   CONTAINER_DEFAULT_WIDTH,
   CONTAINER_MIN_HEIGHT,
   CONTAINER_MIN_WIDTH,
+  CONTAINER_PORT_GUTTER,
   clampPositionInsideParent,
   collectDanglingEdgeIds,
   collectDescendantIds,
@@ -18,6 +19,7 @@ import {
   nextNodeName,
   onlyInsideContainerToast,
   planClampChildInParent,
+  planDragParentChanges,
   planKeepInsideContainer,
   resolveParentAfterDrag,
   stripRuntimeNode
@@ -125,14 +127,52 @@ describe('stripRuntimeNode size round-trip', () => {
       width: 300,
       height: 120,
       selected: true,
-      measured: { width: 300, height: 120 }
+      measured: { width: 300, height: 120 },
+      extent: 'parent'
     })
     const stripped = stripRuntimeNode(task)
     expect(stripped.width).toBe(300)
     expect(stripped.height).toBe(120)
     expect(stripped.measured).toBeUndefined()
     expect(stripped.selected).toBeUndefined()
+    expect(stripped.extent).toBeUndefined()
     expect(stripped.style).toMatchObject({ width: 300, height: 120 })
+  })
+
+  it('drops extent from a container child', () => {
+    const child = node('c', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      extent: 'parent'
+    })
+    expect(stripRuntimeNode(child).extent).toBeUndefined()
+    expect(stripRuntimeNode(child).parentId).toBe('loop')
+  })
+})
+
+describe('branch and merge connections', () => {
+  function connection(
+    source: string,
+    target: string,
+    sourceHandle: string | null = 'start'
+  ): { source: string; target: string; sourceHandle: string | null; targetHandle: string } {
+    return { source, target, sourceHandle, targetHandle: 'end' }
+  }
+
+  it('rejects a start handle on if/switch and a foreign handle on a task', () => {
+    const nodes = [
+      node('iff', 'if', {
+        type: 'branchNode',
+        data: { label: 'if', name: 'If_1', form: { cases: [{ id: 'c1', label: 'Yes', expression: 'x' }] } }
+      }),
+      node('a', 'agent', { type: 'taskNode' }),
+      node('m', 'merge', { type: 'taskNode' }),
+      node('b', 'message', { type: 'taskNode' })
+    ]
+    expect(explainInvalidConnection(nodes, [], connection('iff', 'a', 'start'))).toBe('不能连接：无效的出口')
+    expect(explainInvalidConnection(nodes, [], connection('a', 'm', 'else'))).toBe('不能连接：无效的出口')
+    expect(isValidFlowConnection(nodes, [], connection('iff', 'a', 'c1'))).toBe(true)
+    expect(isValidFlowConnection(nodes, [edge('e1', 'a', 'm')], connection('b', 'm'))).toBe(true)
   })
 })
 
@@ -260,6 +300,31 @@ describe('planClampChildInParent', () => {
       height: 80
     })
     expect(planClampChildInParent(inner, [box, inner])).toBeNull()
+  })
+})
+
+describe('planDragParentChanges port gutter', () => {
+  it('clamps a node dragged onto a container away from the outgoing + handle', () => {
+    const box = node('loop', 'foreach', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300
+    })
+    const task = node('task', 'agent', {
+      type: 'taskNode',
+      position: { x: 200, y: 80 },
+      width: 240,
+      height: 80
+    })
+    const changes = planDragParentChanges([task], [box, task], { x: 300, y: 120 })
+    expect(changes).toEqual([
+      {
+        id: 'task',
+        parentId: 'loop',
+        position: { x: 400 - 240 - CONTAINER_PORT_GUTTER, y: 80 }
+      }
+    ])
   })
 })
 

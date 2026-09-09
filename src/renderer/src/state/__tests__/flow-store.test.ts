@@ -105,6 +105,28 @@ describe('flow-store', () => {
     expect(starts[0]?.id).toBe('start')
   })
 
+  it('RF remove of a container drops current children only and leaves ghost-parented nodes', () => {
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    useFlowStore.getState().addNode(inner)
+    const orphan = createOperatorNode('message', { x: 80, y: 200 }, useFlowStore.getState().nodes)
+    orphan.parentId = 'ghost'
+    useFlowStore.getState().addNode(orphan)
+    const outsider = createOperatorNode('end', { x: 400, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(outsider)
+    useFlowStore.getState().onNodesChange([{ id: outsider.id, type: 'remove' }])
+    expect(useFlowStore.getState().nodes.some((node) => node.id === orphan.id)).toBe(true)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === orphan.id)?.parentId).toBe('ghost')
+    useFlowStore.getState().onNodesChange([{ id: box.id, type: 'remove' }])
+    expect(useFlowStore.getState().nodes.some((node) => node.id === box.id)).toBe(false)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === inner.id)).toBe(false)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === `${box.id}:start`)).toBe(false)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === orphan.id)).toBe(true)
+  })
+
   it('cascades container deletion and refuses to delete loopStart or start', () => {
     const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
     useFlowStore.getState().addNode(box)
@@ -153,6 +175,290 @@ describe('flow-store', () => {
     expect(copies.length).toBe(2)
     const pasted = copies.find((node) => node.id !== box.id)
     expect(useFlowStore.getState().nodes.some((node) => node.id === `${pasted?.id}:start`)).toBe(true)
+  })
+
+  it('keeps copies when the source container is deleted after pasting into another', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(dest)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(inner.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(dest.id)
+    useFlowStore.getState().pasteClipboard()
+    const pasted = useFlowStore.getState().nodes.find(
+      (node) => node.data.label === 'agent' && node.id !== inner.id
+    )
+    expect(pasted?.parentId).toBe(dest.id)
+    useFlowStore.getState().removeNode(source.id)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === pasted?.id)).toBe(true)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === pasted?.id)?.parentId).toBe(dest.id)
+  })
+
+  it('keeps every multi-node copy after paste into B and delete A', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(dest)
+    const first = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(first)
+    const second = createOperatorNode('message', { x: 40, y: 180 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(second)
+    useFlowStore.getState().selectNode(first.id)
+    useFlowStore.getState().selectNode(second.id, { exclusive: false })
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(dest.id)
+    const beforePaste = useFlowStore.getState().historyPast.length
+    useFlowStore.getState().pasteClipboard()
+    expect(useFlowStore.getState().historyPast.length).toBe(beforePaste + 1)
+    const copies = useFlowStore.getState().nodes.filter(
+      (node) =>
+        (node.data.label === 'agent' || node.data.label === 'message') &&
+        node.id !== first.id &&
+        node.id !== second.id
+    )
+    expect(copies).toHaveLength(2)
+    expect(copies.every((node) => node.parentId === dest.id)).toBe(true)
+    useFlowStore.getState().undo()
+    expect(
+      useFlowStore.getState().nodes.filter((node) => node.data.label === 'agent' || node.data.label === 'message')
+    ).toHaveLength(2)
+    useFlowStore.getState().redo()
+    useFlowStore.getState().removeNode(source.id)
+    expect(copies.every((node) => useFlowStore.getState().nodes.some((item) => item.id === node.id))).toBe(true)
+    expect(
+      copies.every((node) => useFlowStore.getState().nodes.find((item) => item.id === node.id)?.parentId === dest.id)
+    ).toBe(true)
+  })
+
+  it('pastes onto an empty pane at absolute coordinates and detaches from A', () => {
+    const source = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(inner.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(null)
+    useFlowStore.getState().pasteClipboard()
+    const pasted = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== inner.id)
+    expect(pasted?.parentId).toBeUndefined()
+    expect(pasted?.position).toEqual({ x: 180, y: 210 })
+    expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.parentId).toBe(source.id)
+  })
+
+  it('duplicate keeps the original parentId', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(inner.id)
+    useFlowStore.getState().duplicateSelected()
+    const copy = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== inner.id)
+    expect(copy?.parentId).toBe(source.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.parentId).toBe(source.id)
+  })
+
+  it('paste without changing selection stays in the source container', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(inner.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().pasteClipboard()
+    const pasted = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== inner.id)
+    expect(pasted?.parentId).toBe(source.id)
+  })
+
+  it('repeat paste inside a container stacks with a small relative offset', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(inner.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().pasteClipboard()
+    const first = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== inner.id)
+    useFlowStore.getState().pasteClipboard()
+    const copies = useFlowStore.getState().nodes.filter((node) => node.data.label === 'agent' && node.id !== inner.id)
+    expect(copies).toHaveLength(2)
+    expect(copies.every((node) => node.parentId === source.id)).toBe(true)
+    const second = copies.find((node) => node.id !== first?.id)
+    expect(first?.position).toEqual({ x: 80, y: 130 })
+    expect(second?.position).toEqual({ x: 96, y: 146 })
+  })
+
+  it('repeat pane paste stays detached at absolute coordinates', () => {
+    const source = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(inner.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(null)
+    useFlowStore.getState().pasteClipboard()
+    const first = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== inner.id)
+    expect(first?.parentId).toBeUndefined()
+    expect(first?.position).toEqual({ x: 180, y: 210 })
+    useFlowStore.getState().selectNode(null)
+    useFlowStore.getState().pasteClipboard()
+    const copies = useFlowStore.getState().nodes.filter((node) => node.data.label === 'agent' && node.id !== inner.id)
+    expect(copies).toHaveLength(2)
+    expect(copies.every((node) => node.parentId == null)).toBe(true)
+    const second = copies.find((node) => node.id !== first?.id)
+    expect(second?.position).toEqual({ x: 196, y: 226 })
+  })
+
+  it('paste of break onto an empty pane or start stays in the source container', () => {
+    const source = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const brk = createOperatorNode('break', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(brk)
+    useFlowStore.getState().selectNode(brk.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(null)
+    useFlowStore.getState().pasteClipboard()
+    const ontoPane = useFlowStore.getState().nodes.find((node) => node.data.label === 'break' && node.id !== brk.id)
+    expect(ontoPane?.parentId).toBe(source.id)
+    expect(useFlowStore.getState().nodes.filter((node) => node.data.label === 'break' && !node.parentId)).toHaveLength(
+      0
+    )
+
+    useFlowStore.getState().selectNode('start')
+    useFlowStore.getState().pasteClipboard()
+    const breaks = useFlowStore.getState().nodes.filter((node) => node.data.label === 'break')
+    expect(breaks).toHaveLength(3)
+    expect(breaks.every((node) => node.parentId === source.id)).toBe(true)
+  })
+
+  it('multi-reparent then delete A leaves every moved node in B', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    dest.width = 420
+    dest.height = 280
+    useFlowStore.getState().addNode(dest)
+    const first = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(first)
+    const second = createOperatorNode('message', { x: 40, y: 180 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(second)
+    const before = useFlowStore.getState().historyPast.length
+    useFlowStore.getState().onNodesChange([
+      { id: first.id, type: 'position', position: { x: 20, y: 30 }, dragging: false },
+      { id: second.id, type: 'position', position: { x: 20, y: 120 }, dragging: false }
+    ])
+    useFlowStore.getState().setNodeParents([
+      { id: first.id, parentId: dest.id, position: { x: 20, y: 30 } },
+      { id: second.id, parentId: dest.id, position: { x: 20, y: 120 } }
+    ])
+    expect(useFlowStore.getState().historyPast.length).toBe(before + 1)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === first.id)?.parentId).toBe(dest.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === second.id)?.parentId).toBe(dest.id)
+    useFlowStore.getState().undo()
+    expect(useFlowStore.getState().nodes.find((node) => node.id === first.id)?.parentId).toBe(source.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === second.id)?.parentId).toBe(source.id)
+    useFlowStore.getState().redo()
+    useFlowStore.getState().removeNode(source.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === first.id)?.parentId).toBe(dest.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === second.id)?.parentId).toBe(dest.id)
+    useFlowStore.getState().onNodesChange([{ id: dest.id, type: 'remove' }])
+    expect(useFlowStore.getState().nodes.some((node) => node.id === first.id)).toBe(false)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === second.id)).toBe(false)
+  })
+
+  it('removeSelected on A after a multi-reparent does not delete the moved nodes', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(dest)
+    const first = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(first)
+    const second = createOperatorNode('message', { x: 40, y: 180 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(second)
+    useFlowStore.getState().setNodeParents([
+      { id: first.id, parentId: dest.id, position: { x: 20, y: 30 } },
+      { id: second.id, parentId: dest.id, position: { x: 20, y: 120 } }
+    ])
+    useFlowStore.getState().selectNode(source.id)
+    useFlowStore.getState().removeSelected()
+    expect(useFlowStore.getState().nodes.some((node) => node.id === source.id)).toBe(false)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === first.id)?.parentId).toBe(dest.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === second.id)?.parentId).toBe(dest.id)
+  })
+
+  it('pastes into B when a child inside B is selected', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(dest)
+    const fromA = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(fromA)
+    const inB = createOperatorNode('message', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: dest.id
+    })
+    useFlowStore.getState().addNode(inB)
+    useFlowStore.getState().selectNode(fromA.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(inB.id)
+    useFlowStore.getState().pasteClipboard()
+    const pasted = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== fromA.id)
+    expect(pasted?.parentId).toBe(dest.id)
+  })
+
+  it('pastes into B when two children inside B are selected', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(dest)
+    const fromA = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(fromA)
+    const inB = createOperatorNode('message', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: dest.id
+    })
+    useFlowStore.getState().addNode(inB)
+    const alsoInB = createOperatorNode('code', { x: 40, y: 180 }, useFlowStore.getState().nodes, {
+      parentId: dest.id
+    })
+    useFlowStore.getState().addNode(alsoInB)
+    useFlowStore.getState().selectNode(fromA.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(inB.id)
+    useFlowStore.getState().selectNode(alsoInB.id, { exclusive: false })
+    useFlowStore.getState().pasteClipboard()
+    const pasted = useFlowStore.getState().nodes.find((node) => node.data.label === 'agent' && node.id !== fromA.id)
+    expect(pasted?.parentId).toBe(dest.id)
   })
 
   it('renames references when a node name changes', () => {
@@ -299,9 +605,32 @@ describe('flow-store', () => {
         dragging: false
       }
     ])
+    expect(useFlowStore.getState().historyAmendable).toBe(true)
     useFlowStore.getState().setNodeParent(task.id, box.id, { x: 10, y: 10 })
     expect(useFlowStore.getState().historyPast.length).toBe(before + 1)
+    expect(useFlowStore.getState().historyAmendable).toBe(false)
     expect(useFlowStore.getState().nodes.find((node) => node.id === task.id)?.parentId).toBe(box.id)
+  })
+
+  it('no-op drag-end clears historyAmendable so standalone reparent is its own undo step', () => {
+    const box = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const task = agentNode()
+    useFlowStore.getState().addNode(task)
+    const origin = useFlowStore.getState().nodes.find((node) => node.id === task.id)?.position
+    expect(origin).toBeDefined()
+    const past = useFlowStore.getState().historyPast.length
+    useFlowStore.getState().onNodesChange([
+      { id: task.id, type: 'position', position: { x: origin!.x, y: origin!.y }, dragging: false }
+    ])
+    expect(useFlowStore.getState().historyAmendable).toBe(false)
+    expect(useFlowStore.getState().historyPast.length).toBe(past)
+    useFlowStore.getState().setNodeParent(task.id, box.id, { x: 30, y: 70 })
+    expect(useFlowStore.getState().historyPast.length).toBe(past + 1)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === task.id)?.parentId).toBe(box.id)
+    useFlowStore.getState().undo()
+    expect(useFlowStore.getState().nodes.some((node) => node.id === task.id)).toBe(true)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === task.id)?.parentId).toBeUndefined()
   })
 
   it('selectNode exclusive:false writes node.selected', () => {
@@ -361,6 +690,28 @@ describe('flow-store', () => {
     const before = useFlowStore.getState().viewportRequest
     useFlowStore.getState().resetToEmpty()
     expect(useFlowStore.getState().viewportRequest).toBe(before + 1)
+  })
+
+  it('loadDocument increments viewportRequest and strips extent', () => {
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    inner.extent = 'parent'
+    const before = useFlowStore.getState().viewportRequest
+    useFlowStore.getState().loadDocument(
+      {
+        version: 1,
+        title: 'Loaded',
+        graph: { nodes: [useFlowStore.getState().nodes[0]!, box, inner], edges: [] },
+        components: {},
+        globals: {}
+      },
+      null
+    )
+    expect(useFlowStore.getState().viewportRequest).toBe(before + 1)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.extent).toBeUndefined()
+    expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.parentId).toBe(box.id)
   })
 
   it('applyNodePositions writes coords/size, pushes one history entry, and undoes', () => {

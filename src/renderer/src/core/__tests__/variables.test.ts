@@ -37,10 +37,14 @@ function edge(source: string, target: string, sourceHandle = 'start'): FlowEdge 
 
 describe('parseReferences', () => {
   it('parses node.variable and global refs', () => {
-    const refs = parseReferences('hi {{Agent_1.text}} and {{sys.query}} {{start.q}} {{bad}} {{.x}}')
+    const refs = parseReferences(
+      'hi {{Agent_1.text}} and {{sys.query}} {{sys.files}} {{sys.now}} {{start.q}} {{bad}} {{.x}}'
+    )
     expect(refs).toEqual([
       { raw: '{{Agent_1.text}}', node: 'Agent_1', variable: 'text' },
       { raw: '{{sys.query}}', node: 'sys', variable: 'query' },
+      { raw: '{{sys.files}}', node: 'sys', variable: 'files' },
+      { raw: '{{sys.now}}', node: 'sys', variable: 'now' },
       { raw: '{{start.q}}', node: 'start', variable: 'q' }
     ])
   })
@@ -61,6 +65,8 @@ describe('getUpstreamNodeIds / getAvailableVariables', () => {
 
     const vars = getAvailableVariables('inner', nodes, edges)
     expect(vars.some((item) => item.nodeName === 'sys' && item.variable.name === 'query')).toBe(true)
+    expect(vars.some((item) => item.nodeName === 'sys' && item.variable.name === 'files')).toBe(true)
+    expect(vars.some((item) => item.nodeName === 'sys' && item.variable.name === 'now')).toBe(true)
     expect(vars.some((item) => item.nodeName === 'Start_1' && item.variable.name === 'q')).toBe(true)
     expect(vars.some((item) => item.scope === 'container' && item.variable.name === 'item')).toBe(true)
     expect(vars.some((item) => item.scope === 'container' && item.variable.name === 'index')).toBe(true)
@@ -125,6 +131,18 @@ describe('renameReferencesInForm / Graph', () => {
     const next = renameReferencesInGraph(nodes, 'Old', 'New')
     expect(next[0]?.data.form.prompt).toBe('{{New.text}}')
     expect(nodes[0]?.data.form.prompt).toBe('{{Old.text}}')
+  })
+
+  it('rewrites foreach item and results when the container is renamed', () => {
+    const nodes = [
+      node('loop', 'foreach', 'For_1', { items: '{{sys.files}}' }),
+      node('inner', 'message', 'Msg_1', { content: '{{For_1.item}} {{For_1.index}}' }, { parentId: 'loop' }),
+      node('after', 'message', 'After_1', { content: '{{For_1.results}}' })
+    ]
+    const next = renameReferencesInGraph(nodes, 'For_1', 'MyLoop')
+    expect(next.find((item) => item.id === 'inner')?.data.form.content).toBe('{{MyLoop.item}} {{MyLoop.index}}')
+    expect(next.find((item) => item.id === 'after')?.data.form.content).toBe('{{MyLoop.results}}')
+    expect(nodes.find((item) => item.id === 'after')?.data.form.content).toBe('{{For_1.results}}')
   })
 })
 

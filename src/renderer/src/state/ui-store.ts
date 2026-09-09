@@ -13,6 +13,8 @@ interface UiState {
   inspectorNodeId: string | null
   openInspector: (nodeId: string) => void
   closeInspector: () => void
+  /** 换文档时收起属性面板和侧栏分类飞出层；画布 picker/菜单靠 viewportRequest。 */
+  closeTransientUi: () => void
   toast: string | null
   showToast: (message: string) => void
 }
@@ -25,6 +27,7 @@ export const useUiStore = create<UiState>((set) => ({
   inspectorNodeId: null,
   openInspector: (nodeId) => set({ inspectorNodeId: nodeId }),
   closeInspector: () => set({ inspectorNodeId: null }),
+  closeTransientUi: () => set({ inspectorNodeId: null, openCategory: null }),
   toast: null,
   showToast: (message) => {
     if (toastTimer !== undefined) {

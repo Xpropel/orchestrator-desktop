@@ -59,6 +59,7 @@ export const useFlowStore = create<FlowState>()(
       ...createDirtySlice(...args),
       ...initialCanvas,
       revision: 0,
+      historyAmendable: false,
       viewportRequest: 0,
       viewport: { x: 0, y: 0, zoom: 1 },
       historyPast: [initialSnapshot],
@@ -103,19 +104,17 @@ export const useFlowStore = create<FlowState>()(
                 extra.add(childId)
               }
             }
-            const liveIds = new Set(state.nodes.map((node) => node.id))
-            for (const node of state.nodes) {
-              if (node.parentId && !liveIds.has(node.parentId)) {
-                extra.add(node.id)
-              }
-            }
             dropIds(state, extra)
           }
           if (state.selectedNodeId && removedIds.has(state.selectedNodeId)) {
             state.selectedNodeId = null
           }
           if (shouldRecord) {
-            pushSnapshot(state)
+            const recorded = pushSnapshot(state)
+            // 仅在拖拽落点真正写入历史后允许 setNodeParents 合并；空 position 快照清掉标志。
+            state.historyAmendable =
+              recorded &&
+              nextChanges.some((change) => change.type === 'position' && change.dragging === false)
           }
           syncDirtyFromSnapshot(state)
         })

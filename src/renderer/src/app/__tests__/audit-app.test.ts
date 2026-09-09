@@ -54,7 +54,10 @@ describe('shortcuts vs text fields', () => {
     expect(resolveBrowserShortcut(keyEvent({ key: 'z', ctrlKey: true }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'c', ctrlKey: true }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'v', ctrlKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'd', ctrlKey: true }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'd', metaKey: true }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 'Delete' }))).toBeNull()
+    expect(resolveBrowserShortcut(keyEvent({ key: 'Backspace' }))).toBeNull()
     expect(resolveBrowserShortcut(keyEvent({ key: 's', ctrlKey: true }))).toBe('save')
     spy.mockRestore()
   })
@@ -74,6 +77,7 @@ describe('Electron menu action vs typing', () => {
     expect(textFieldMenuBehavior('copy')).toBe('native-edit')
     expect(textFieldMenuBehavior('paste')).toBe('native-edit')
     expect(textFieldMenuBehavior('undo')).toBe('native-edit')
+    expect(textFieldMenuBehavior('redo')).toBe('native-edit')
     expect(textFieldMenuBehavior('delete')).toBe('native-edit')
     expect(textFieldMenuBehavior('duplicate')).toBe('swallow')
     expect(textFieldMenuBehavior('save')).toBe('forward')
@@ -100,6 +104,19 @@ describe('runMenuAction delete', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('does not delete the graph when a text field is focused', () => {
+    const spy = vi.spyOn(textTarget, 'isTextInputTarget').mockReturnValue(true)
+    vi.stubGlobal('document', { activeElement: {}, execCommand: () => true })
+    const created = createOperatorNode('agent', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(created)
+    useFlowStore.getState().selectNode(created.id)
+    runMenuAction('delete')
+    runMenuAction('duplicate')
+    expect(useFlowStore.getState().nodes.some((node) => node.id === created.id)).toBe(true)
+    expect(useFlowStore.getState().nodes.filter((node) => node.data.label === 'agent')).toHaveLength(1)
+    spy.mockRestore()
   })
 
   it('deletes every selected node, not only selectedNodeId', () => {

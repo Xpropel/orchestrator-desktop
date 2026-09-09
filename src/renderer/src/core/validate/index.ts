@@ -81,7 +81,7 @@ export function validateFlow(
       ...ruleUnreachable(node, operator, startIds, reachable),
       ...ruleDeadEnd(node, operator, edges),
       ...ruleEmptyContainer(node, operator, nodes),
-      ...ruleBreakOutsideLoop(node, operator),
+      ...ruleBreakOutsideLoop(node, operator, nodes),
       ...ruleWhileNoCondition(node, operator),
       ...ruleForeachItemsNotArray(node, operator, nodes, edges),
       ...ruleBranchNoTarget(node, operator, edges),

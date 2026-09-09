@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -23,6 +23,7 @@ function makeNode(
     type: extras.type,
     position: extras.position ?? { x: 0, y: 0 },
     parentId: extras.parentId,
+    extent: extras.extent,
     data: {
       label,
       name: extras.data?.name ?? label,
@@ -154,11 +155,31 @@ describe('graphToDocument', () => {
   })
 
   it('strips runtime fields', () => {
-    const doc = graphToDocument([makeNode('begin', 'start', {})], [], 'Clean')
-    const begin = doc.graph.nodes[0] as FlowNode & { selected?: unknown; dragging?: unknown; measured?: unknown }
+    const doc = graphToDocument(
+      [makeNode('begin', 'start', {}, { extent: 'parent' })],
+      [makeEdge('e1', 'begin', 'begin')],
+      'Clean'
+    )
+    const begin = doc.graph.nodes[0] as FlowNode & {
+      selected?: unknown
+      dragging?: unknown
+      measured?: unknown
+      extent?: unknown
+    }
     expect(begin.selected).toBeUndefined()
     expect(begin.dragging).toBeUndefined()
     expect(begin.measured).toBeUndefined()
+    expect(begin.extent).toBeUndefined()
+    expect(doc.graph.edges[0]?.selected).toBeUndefined()
+    const raw = JSON.parse(serializeDocument(doc)) as {
+      graph: { nodes: Array<Record<string, unknown>>; edges: Array<Record<string, unknown>> }
+    }
+    for (const item of [...raw.graph.nodes, ...raw.graph.edges]) {
+      expect(item).not.toHaveProperty('selected')
+      expect(item).not.toHaveProperty('measured')
+      expect(item).not.toHaveProperty('dragging')
+      expect(item).not.toHaveProperty('extent')
+    }
   })
 })
 
@@ -441,39 +462,91 @@ describe('documentToGraph / serialize / parse', () => {
       [],
       'Legacy'
     )
+    expect(doc.graph.nodes.find((item) => item.id === 'inner')?.extent).toBeUndefined()
     const { nodes } = documentToGraph(doc)
     expect(nodes.find((item) => item.id === 'inner')?.extent).toBeUndefined()
   })
+
+  it('strips extent/selected/measured on load even when the JSON still has them', () => {
+    const imported = documentToGraph(
+      parseDocument(
+        JSON.stringify({
+          version: 1,
+          title: 'LegacyRuntime',
+          graph: {
+            nodes: [
+              {
+                id: 'loop',
+                type: 'containerNode',
+                position: { x: 0, y: 0 },
+                data: { label: 'foreach', name: 'For_1', form: { items: '{{sys.files}}' } }
+              },
+              {
+                id: 'inner',
+                type: 'taskNode',
+                position: { x: 40, y: 80 },
+                parentId: 'loop',
+                extent: 'parent',
+                selected: true,
+                dragging: true,
+                measured: { width: 180, height: 64 },
+                data: { label: 'code', name: 'Code_1', form: { code: '1' } }
+              }
+            ],
+            edges: [{ id: 'e1', source: 'loop', target: 'inner', selected: true }]
+          },
+          components: {}
+        })
+      )
+    )
+    const inner = imported.nodes.find((item) => item.id === 'inner')
+    expect(inner?.parentId).toBe('loop')
+    expect(inner?.extent).toBeUndefined()
+    expect(inner?.selected).toBeUndefined()
+    expect(inner?.dragging).toBeUndefined()
+    expect(inner?.measured).toBeUndefined()
+    expect(imported.edges[0]?.selected).toBeUndefined()
+  })
 })
 
-function listExampleFlowFiles(): string[] {
-  const roots = [join(process.cwd(), 'examples')]
-  const privateDir = join(roots[0], 'private')
-  if (existsSync(privateDir)) roots.push(privateDir)
-  return roots.flatMap((dir) =>
-    readdirSync(dir)
-      .filter((name) => name.endsWith('.flow.json'))
-      .map((name) => join(dir, name))
-  )
+function listPublicExampleFlowFiles(): string[] {
+  const dir = join(process.cwd(), 'examples')
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.flow.json'))
+    .map((name) => join(dir, name))
 }
 
 describe('examples/*.flow.json', () => {
-  it('parses every example; containers keep children (no extent) and a loop-start', () => {
-    const files = listExampleFlowFiles()
-    if (files.length === 0) return
+  it('round-trips every public example: parse → graph → serialize → parse', () => {
+    const files = listPublicExampleFlowFiles()
+    expect(files.length).toBeGreaterThan(0)
     for (const file of files) {
-      const doc = parseDocument(readFileSync(file, 'utf8'))
-      const graph = documentToGraph(doc)
-      expect(graph.title.length).toBeGreaterThan(0)
-      expect(graph.nodes.some((item) => item.id === 'start')).toBe(true)
-      for (const item of graph.nodes) {
+      const first = parseDocument(readFileSync(file, 'utf8'))
+      const graph = documentToGraph(first)
+      const serialized = graphToDocument(graph.nodes, graph.edges, graph.title, first.globals ?? {})
+      const second = parseDocument(serializeDocument(serialized))
+      const again = documentToGraph(second)
+
+      expect(again.title.length).toBeGreaterThan(0)
+      expect(again.nodes.some((item) => item.id === 'start' || item.data.label === 'start')).toBe(true)
+      expect(again.nodes.map((item) => item.id).sort()).toEqual(graph.nodes.map((item) => item.id).sort())
+
+      for (const item of [...serialized.graph.nodes, ...second.graph.nodes, ...again.nodes]) {
         expect(item.extent).toBeUndefined()
+        expect(item.selected).toBeUndefined()
+        expect(item.dragging).toBeUndefined()
+        expect(item.measured).toBeUndefined()
       }
-      const containers = graph.nodes.filter((item) => item.type === 'containerNode')
+
+      const containers = again.nodes.filter((item) => item.type === 'containerNode')
       for (const container of containers) {
-        const children = graph.nodes.filter((item) => item.parentId === container.id)
+        const children = again.nodes.filter((item) => item.parentId === container.id)
         expect(children.length).toBeGreaterThan(0)
         expect(children.some((item) => item.type === 'loopStartNode')).toBe(true)
+        for (const child of children) {
+          expect(second.components[child.id]?.parent_id).toBe(container.id)
+          expect(serialized.components[child.id]?.parent_id).toBe(container.id)
+        }
       }
     }
   })

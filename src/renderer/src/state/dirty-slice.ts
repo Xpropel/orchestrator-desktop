@@ -1,8 +1,9 @@
-import { snapshotKeyOf } from '@/core/graph'
+import { snapshotKeyOf, stripRuntimeFields } from '@/core/graph'
 import type { FlowSlice } from './flow-slice'
 import { emptyCanvas, keyOf, snapshotOf, titleFromPath } from './flow-helpers'
 import { flushFormHistory } from './history-slice'
 import type { DirtySlice } from './flow-state'
+import { useUiStore } from './ui-store'
 
 export const createDirtySlice: FlowSlice<DirtySlice> = (set) => ({
   dirty: false,
@@ -32,17 +33,20 @@ export const createDirtySlice: FlowSlice<DirtySlice> = (set) => ({
   },
   loadDocument: (doc, filePath) => {
     flushFormHistory()
+    useUiStore.getState().closeTransientUi()
     set((state) => {
-      state.nodes = doc.graph.nodes
-      state.edges = doc.graph.edges
+      const stripped = stripRuntimeFields(doc.graph.nodes, doc.graph.edges)
+      state.nodes = stripped.nodes
+      state.edges = stripped.edges
       state.title = doc.title
       state.filePath = filePath
       state.globals = { ...(doc.globals ?? {}) }
       state.selectedNodeId = null
       state.dirty = false
-      const snap = snapshotOf(doc.graph.nodes, doc.graph.edges, doc.title, state.globals)
+      const snap = snapshotOf(stripped.nodes, stripped.edges, doc.title, state.globals)
       state.historyPast = [snap]
       state.historyFuture = []
+      state.historyAmendable = false
       state.savedSnapshotKey = snapshotKeyOf(snap)
       state.revision += 1
       state.viewportRequest += 1
@@ -50,6 +54,7 @@ export const createDirtySlice: FlowSlice<DirtySlice> = (set) => ({
   },
   resetToEmpty: () => {
     flushFormHistory()
+    useUiStore.getState().closeTransientUi()
     set((state) => {
       const next = emptyCanvas()
       state.nodes = next.nodes
@@ -62,6 +67,7 @@ export const createDirtySlice: FlowSlice<DirtySlice> = (set) => ({
       const snap = snapshotOf(next.nodes, next.edges, next.title, next.globals)
       state.historyPast = [snap]
       state.historyFuture = []
+      state.historyAmendable = false
       state.savedSnapshotKey = snapshotKeyOf(snap)
       state.revision += 1
       state.viewportRequest += 1

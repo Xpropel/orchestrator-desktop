@@ -62,6 +62,21 @@ describe('audit validate: containers and reachability', () => {
     const edges = [edge('s', 'loop'), edge('loop:start', 'm'), edge('m', 'b'), edge('loop:start', 'ie')]
     expect(issues(nodes, edges, 'DEAD_END')).toHaveLength(0)
     expect(issues(nodes, edges, 'BREAK_OUTSIDE_LOOP')).toHaveLength(0)
+    const ghost = node('ghost-break', 'break', 'Break_ghost', {}, { parentId: 'missing' })
+    expect(issues([...nodes, ghost], edges, 'BREAK_OUTSIDE_LOOP').map((item) => item.nodeId)).toEqual([
+      'ghost-break'
+    ])
+  })
+
+  it('treats a child reached only via a cross-container edge as reachable', () => {
+    const loop = node('loop', 'foreach', 'Loop_1', { items: '{{sys.files}}' }, { type: 'containerNode' })
+    const loopStart = node('loop:start', 'loop-start', 'LoopStart_1', {}, { type: 'loopStartNode', parentId: 'loop' })
+    const inner = node('a', 'agent', 'Agent_1', { prompt: 'p', model: 'm' }, { type: 'taskNode', parentId: 'loop' })
+    const end = node('e', 'end', 'End_1')
+    const nodes = [start(), loop, loopStart, inner, end]
+    const edges = [edge('s', 'a'), edge('a', 'e')]
+    expect(issues(nodes, edges, 'UNREACHABLE').map((item) => item.nodeId)).toEqual(['loop'])
+    expect(issues(nodes, edges, 'CROSS_CONTAINER_EDGE')).toHaveLength(0)
   })
 
   it('allows container ↔ child edges and in/out crossing edges', () => {
@@ -166,6 +181,15 @@ describe('audit validate: references and required', () => {
     const found = issues([start(), w, child], [edge('s', 'w')])
     expect(found.filter((item) => item.code === 'WHILE_NO_CONDITION')).toHaveLength(1)
     expect(found.filter((item) => item.code === 'MISSING_REQUIRED' && item.field === 'condition')).toHaveLength(0)
+    const blank = node('w2', 'while', 'While_2', { condition: '   ' })
+    const missing = node('w3', 'while', 'While_3', {})
+    const child2 = node('n2', 'message', 'Msg_2', { content: 'x' }, { parentId: 'w2' })
+    const child3 = node('n3', 'message', 'Msg_3', { content: 'x' }, { parentId: 'w3' })
+    expect(issues([start(), blank, child2], [edge('s', 'w2')], 'WHILE_NO_CONDITION')).toHaveLength(1)
+    expect(issues([start(), missing, child3], [edge('s', 'w3')], 'WHILE_NO_CONDITION')).toHaveLength(1)
+    const foreach = node('f', 'foreach', 'For_1', { items: '{{sys.files}}' })
+    const fchild = node('n4', 'message', 'Msg_4', { content: 'x' }, { parentId: 'f' })
+    expect(issues([start(), foreach, fchild], [edge('s', 'f')], 'WHILE_NO_CONDITION')).toHaveLength(0)
   })
 
   it('gives each unknown reference on one node a distinct issue id', () => {
@@ -237,6 +261,17 @@ describe('audit validate: branches and extensions', () => {
         'BRANCH_NO_TARGET'
       )
     ).toHaveLength(0)
+    const two = node('sw2', 'switch', 'Switch_2', {
+      cases: [
+        { id: 'c1', label: 'A', expression: '1' },
+        { id: 'c2', label: 'B', expression: '2' }
+      ]
+    })
+    expect(
+      issues([start(), two, end], [edge('s', 'sw2'), edge('sw2', 'e', 'c1')], 'BRANCH_NO_TARGET').map(
+        (item) => item.field
+      )
+    ).toEqual(['c2', 'else'])
   })
 
   it('keeps validating after an extension rule throws', () => {

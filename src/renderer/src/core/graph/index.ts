@@ -1,9 +1,11 @@
 export { canAddOperator } from './can-add'
 export {
   type ClipboardGraph,
+  type RemapClipboardOptions,
   expandCopyIds,
   extractSubgraph,
-  remapClipboard
+  remapClipboard,
+  resolvePasteParentId
 } from './clipboard'
 export {
   collectDanglingEdgeIds,
@@ -31,6 +33,8 @@ export {
   findIntersectingContainer,
   findNonOverlappingPosition,
   resolveParentAfterDrag,
+  type DragParentChange,
+  planDragParentChanges,
   clampPositionInsideParent,
   planClampChildInParent,
   mustRemainInsideContainer,

@@ -1,11 +1,13 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { graphToDocument } from '@/core/dsl'
+import { documentToGraph, graphToDocument, parseDocument, serializeDocument } from '@/core/dsl'
 import { createOperatorNode } from '@/core/graph'
 import { loadLibrary } from '@/core/library'
 import type { FlowNode } from '@/core/types'
 import { flushFormHistory } from '../history-slice'
+import { dropCrossContainerEdges } from '../container-slice'
 import { useFlowStore } from '../flow-store'
 import { selectStableNode, shallowStableNodeEqual } from '../select-node'
+import { useUiStore } from '../ui-store'
 
 beforeAll(() => {
   loadLibrary()
@@ -32,6 +34,20 @@ describe('audit-state', () => {
   afterEach(() => {
     flushFormHistory()
     vi.useRealTimers()
+  })
+
+  it('loadDocument and resetToEmpty close leftover UI and bump viewportRequest', () => {
+    useUiStore.setState({ inspectorNodeId: 'stale', openCategory: 'logic' })
+    const before = useFlowStore.getState().viewportRequest
+    const { nodes, edges, title, globals } = useFlowStore.getState()
+    useFlowStore.getState().loadDocument(graphToDocument(nodes, edges, title, globals), null)
+    expect(useFlowStore.getState().viewportRequest).toBe(before + 1)
+    expect(useUiStore.getState().inspectorNodeId).toBeNull()
+    expect(useUiStore.getState().openCategory).toBeNull()
+    useUiStore.setState({ inspectorNodeId: 'again', openCategory: 'logic' })
+    useFlowStore.getState().resetToEmpty()
+    expect(useUiStore.getState().inspectorNodeId).toBeNull()
+    expect(useUiStore.getState().openCategory).toBeNull()
   })
 
   it('does not dirty or record history on the first dimensions change (resizing:false + setAttributes)', () => {
@@ -362,6 +378,53 @@ describe('audit-state', () => {
     expect(useFlowStore.getState().savedSnapshotKey).toBe('')
   })
 
+  it('onConnect from start#new still stores a sixth outgoing edge', () => {
+    const targets = []
+    for (let index = 0; index < 6; index += 1) {
+      const created = createOperatorNode('agent', { x: 320, y: 80 + index * 36 }, useFlowStore.getState().nodes)
+      useFlowStore.getState().addNode(created)
+      targets.push(created)
+    }
+    for (const target of targets) {
+      useFlowStore.getState().onConnect({
+        source: 'start',
+        sourceHandle: 'start#new',
+        target: target.id,
+        targetHandle: 'end'
+      })
+    }
+    const edges = useFlowStore.getState().edges
+    expect(edges).toHaveLength(6)
+    expect(edges.every((edge) => edge.sourceHandle === 'start')).toBe(true)
+    expect(new Set(edges.map((edge) => edge.target)).size).toBe(6)
+  })
+
+  it('onConnect still adds outside→child after outside→container is already stored', () => {
+    const box = createOperatorNode('while', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    useFlowStore.getState().addNode(inner)
+    const outside = createOperatorNode('message', { x: 520, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(outside)
+    useFlowStore.getState().onConnect({
+      source: outside.id,
+      sourceHandle: 'start#new',
+      target: box.id,
+      targetHandle: 'end'
+    })
+    useFlowStore.getState().onConnect({
+      source: outside.id,
+      sourceHandle: 'start#new',
+      target: inner.id,
+      targetHandle: 'end'
+    })
+    const edges = useFlowStore.getState().edges
+    expect(edges.some((edge) => edge.source === outside.id && edge.target === box.id)).toBe(true)
+    expect(edges.some((edge) => edge.source === outside.id && edge.target === inner.id)).toBe(true)
+  })
+
   it('setNodeParent keeps in/out edges and container/sibling edges in one history step', () => {
     const box = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
     useFlowStore.getState().addNode(box)
@@ -500,5 +563,217 @@ describe('audit-state', () => {
       x: 900,
       y: 400
     })
+  })
+
+  it('addNode, onConnect, and adding a container each record one undo step', () => {
+    const past = useFlowStore.getState().historyPast.length
+    const task = createOperatorNode('agent', { x: 300, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(task)
+    expect(useFlowStore.getState().historyPast.length).toBe(past + 1)
+
+    useFlowStore.getState().onConnect({
+      source: 'start',
+      sourceHandle: 'start',
+      target: task.id,
+      targetHandle: 'end'
+    })
+    expect(useFlowStore.getState().historyPast.length).toBe(past + 2)
+    expect(useFlowStore.getState().edges).toHaveLength(1)
+    useFlowStore.getState().undo()
+    expect(useFlowStore.getState().edges).toHaveLength(0)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === task.id)).toBe(true)
+
+    const beforeBox = useFlowStore.getState().historyPast.length
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    expect(useFlowStore.getState().historyPast.length).toBe(beforeBox + 1)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === `${box.id}:start`)).toBe(true)
+    useFlowStore.getState().undo()
+    expect(useFlowStore.getState().nodes.some((node) => node.id === box.id)).toBe(false)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === `${box.id}:start`)).toBe(false)
+  })
+
+  it('standalone setNodeParent is one undo step and restores parentId without dropping the node', () => {
+    const box = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const task = agentNode()
+    useFlowStore.getState().addNode(task)
+    const past = useFlowStore.getState().historyPast.length
+    useFlowStore.getState().setNodeParent(task.id, box.id, { x: 30, y: 70 })
+    expect(useFlowStore.getState().historyPast.length).toBe(past + 1)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === task.id)?.parentId).toBe(box.id)
+    useFlowStore.getState().undo()
+    expect(useFlowStore.getState().nodes.some((node) => node.id === task.id)).toBe(true)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === task.id)?.parentId).toBeUndefined()
+  })
+
+  it('setNodeParents reparents a batch in one step and undo restores every parentId', () => {
+    const box = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    box.width = 560
+    box.height = 340
+    useFlowStore.getState().addNode(box)
+    const a = createOperatorNode('agent', { x: 400, y: 80 }, useFlowStore.getState().nodes)
+    const b = createOperatorNode('message', { x: 400, y: 180 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(a)
+    useFlowStore.getState().addNode(b)
+    const past = useFlowStore.getState().historyPast.length
+    useFlowStore.getState().onNodesChange([
+      { id: a.id, type: 'position', position: { x: 110, y: 90 }, dragging: false },
+      { id: b.id, type: 'position', position: { x: 110, y: 180 }, dragging: false }
+    ])
+    useFlowStore.getState().setNodeParents([
+      { id: a.id, parentId: box.id, position: { x: 10, y: 10 } },
+      { id: b.id, parentId: box.id, position: { x: 10, y: 100 } }
+    ])
+    expect(useFlowStore.getState().historyPast.length).toBe(past + 1)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === a.id)?.parentId).toBe(box.id)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === b.id)?.parentId).toBe(box.id)
+    useFlowStore.getState().undo()
+    expect(useFlowStore.getState().nodes.find((node) => node.id === a.id)?.parentId).toBeUndefined()
+    expect(useFlowStore.getState().nodes.find((node) => node.id === b.id)?.parentId).toBeUndefined()
+  })
+
+  it('dropCrossContainerEdges is a no-op so drag in/out keeps every edge', () => {
+    const box = createOperatorNode('foreach', { x: 100, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    useFlowStore.getState().addNode(inner)
+    const outside = createOperatorNode('message', { x: 520, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(outside)
+    useFlowStore.getState().onConnect({
+      source: inner.id,
+      target: outside.id,
+      sourceHandle: 'start',
+      targetHandle: 'end'
+    })
+    const before = useFlowStore.getState().edges.map((edge) => edge.id)
+    dropCrossContainerEdges(useFlowStore.getState())
+    expect(useFlowStore.getState().edges.map((edge) => edge.id)).toEqual(before)
+    useFlowStore.getState().setNodeParent(inner.id, null, { x: 520, y: 200 })
+    expect(useFlowStore.getState().edges.some((edge) => edge.source === inner.id && edge.target === outside.id)).toBe(
+      true
+    )
+  })
+
+  it('copy-paste then save/load keeps remapped parentIds and strips extent', () => {
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    inner.data = { ...inner.data, name: 'agent_1', form: { prompt: 'hi', model: 'm' } }
+    useFlowStore.getState().addNode(inner)
+    useFlowStore.getState().selectNode(box.id)
+    useFlowStore.getState().copySelected()
+    useFlowStore.getState().selectNode(null)
+    useFlowStore.getState().pasteClipboard()
+
+    const copies = useFlowStore.getState().nodes.filter((node) => node.data.label === 'foreach')
+    expect(copies).toHaveLength(2)
+    const pasted = copies.find((node) => node.id !== box.id)
+    expect(pasted).toBeDefined()
+    const pastedChildren = useFlowStore.getState().nodes.filter((node) => node.parentId === pasted?.id)
+    expect(pastedChildren.length).toBeGreaterThan(0)
+    expect(pastedChildren.every((node) => node.extent === undefined)).toBe(true)
+    expect(pastedChildren.some((node) => node.id === inner.id)).toBe(false)
+
+    const { nodes, edges, title, globals } = useFlowStore.getState()
+    const parsed = parseDocument(serializeDocument(graphToDocument(nodes, edges, title, globals)))
+    const graph = documentToGraph(parsed)
+    useFlowStore.getState().loadDocument(
+      {
+        ...parsed,
+        title: graph.title,
+        graph: { nodes: graph.nodes, edges: graph.edges },
+        globals: parsed.globals ?? {}
+      },
+      null
+    )
+    const loadedBox = useFlowStore.getState().nodes.find((node) => node.id === pasted?.id)
+    const loadedKids = useFlowStore.getState().nodes.filter((node) => node.parentId === pasted?.id)
+    expect(loadedBox).toBeDefined()
+    expect(loadedKids.map((node) => node.id).sort()).toEqual(pastedChildren.map((node) => node.id).sort())
+    expect(useFlowStore.getState().nodes.every((node) => node.extent === undefined)).toBe(true)
+    expect(graphToDocument(useFlowStore.getState().nodes, useFlowStore.getState().edges, 'P').components[pastedChildren[0]!.id]?.parent_id).toBe(
+      pasted?.id
+    )
+  })
+
+  it('copies a note with size and text and does not invent edges', () => {
+    const note = createOperatorNode('note', { x: 120, y: 80 }, useFlowStore.getState().nodes)
+    note.data.form = { text: 'scratch' }
+    useFlowStore.getState().addNode(note)
+    useFlowStore.getState().selectNode(note.id)
+    const edgesBefore = useFlowStore.getState().edges.length
+    useFlowStore.getState().copySelected()
+    expect(useFlowStore.getState().clipboard?.edges).toEqual([])
+    expect(useFlowStore.getState().clipboard?.nodes[0]?.width).toBe(200)
+    expect(useFlowStore.getState().clipboard?.nodes[0]?.height).toBe(140)
+    expect(useFlowStore.getState().clipboard?.nodes[0]?.connectable).toBe(false)
+    useFlowStore.getState().pasteClipboard()
+    const notes = useFlowStore.getState().nodes.filter((node) => node.data.label === 'note')
+    expect(notes).toHaveLength(2)
+    const pasted = notes.find((node) => node.id !== note.id)
+    expect(pasted?.width).toBe(200)
+    expect(pasted?.height).toBe(140)
+    expect(pasted?.style).toMatchObject({ width: 200, height: 140 })
+    expect(pasted?.connectable).toBe(false)
+    expect(pasted?.data.form.text).toBe('scratch')
+    expect(useFlowStore.getState().edges).toHaveLength(edgesBefore)
+    expect(
+      useFlowStore.getState().edges.some((edge) => edge.source === pasted?.id || edge.target === pasted?.id)
+    ).toBe(false)
+  })
+
+  it('renames {{Loop.item}} when the container is renamed', () => {
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    const inner = createOperatorNode('message', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    inner.data = { ...inner.data, form: { content: `{{${box.data.name}.item}}` } }
+    useFlowStore.getState().addNode(inner)
+    const after = createOperatorNode('message', { x: 520, y: 80 }, useFlowStore.getState().nodes)
+    after.data = { ...after.data, form: { content: `{{${box.data.name}.results}}` } }
+    useFlowStore.getState().addNode(after)
+    useFlowStore.getState().updateNodeData(box.id, { name: 'MyLoop' })
+    expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.data.form.content).toBe(
+      '{{MyLoop.item}}'
+    )
+    expect(useFlowStore.getState().nodes.find((node) => node.id === after.id)?.data.form.content).toBe(
+      '{{MyLoop.results}}'
+    )
+  })
+
+  it('removeNode on a container does not delete a child that already changed parentId', () => {
+    const source = createOperatorNode('foreach', { x: 80, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(source)
+    const dest = createOperatorNode('foreach', { x: 700, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(dest)
+    const moved = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(moved)
+    const stayed = createOperatorNode('message', { x: 40, y: 180 }, useFlowStore.getState().nodes, {
+      parentId: source.id
+    })
+    useFlowStore.getState().addNode(stayed)
+    useFlowStore.getState().setNodeParent(moved.id, dest.id, { x: 20, y: 30 })
+    useFlowStore.getState().removeNode(source.id)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === moved.id)).toBe(true)
+    expect(useFlowStore.getState().nodes.find((node) => node.id === moved.id)?.parentId).toBe(dest.id)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === stayed.id)).toBe(false)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === source.id)).toBe(false)
+  })
+
+  it('removeSelected with only loop-start selected keeps it', () => {
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    useFlowStore.getState().addNode(box)
+    useFlowStore.getState().selectNode(`${box.id}:start`, { exclusive: true })
+    useFlowStore.getState().removeSelected()
+    expect(useFlowStore.getState().nodes.some((node) => node.id === `${box.id}:start`)).toBe(true)
+    expect(useFlowStore.getState().nodes.some((node) => node.id === box.id)).toBe(true)
   })
 })

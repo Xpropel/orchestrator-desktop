@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FlowEdge, FlowNode } from '../../types'
-import { cloneGraph, graphsEqual, snapshotKeyOf, stripRuntimeFields } from '../snapshot'
+import { NODE_RUNTIME_KEYS, cloneGraph, graphsEqual, snapshotKeyOf, stripRuntimeFields } from '../snapshot'
 
 function node(extras: Partial<FlowNode> = {}): FlowNode {
   return {
@@ -17,7 +17,8 @@ function edge(extras: Partial<FlowEdge> = {}): FlowEdge {
 }
 
 describe('stripRuntimeFields', () => {
-  it('drops selected/dragging/measured and keeps position plus explicit size', () => {
+  it('drops selected/dragging/measured/extent and keeps position plus explicit size', () => {
+    expect(NODE_RUNTIME_KEYS).toContain('extent')
     const stripped = stripRuntimeFields(
       [
         node({
@@ -25,7 +26,8 @@ describe('stripRuntimeFields', () => {
           dragging: true,
           measured: { width: 99, height: 40 },
           width: 240,
-          height: 80
+          height: 80,
+          extent: 'parent'
         })
       ],
       [edge({ selected: true })]
@@ -33,6 +35,7 @@ describe('stripRuntimeFields', () => {
     expect(stripped.nodes[0]?.selected).toBeUndefined()
     expect(stripped.nodes[0]?.dragging).toBeUndefined()
     expect(stripped.nodes[0]?.measured).toBeUndefined()
+    expect(stripped.nodes[0]?.extent).toBeUndefined()
     expect(stripped.nodes[0]?.position).toEqual({ x: 10, y: 20 })
     expect(stripped.nodes[0]?.width).toBe(240)
     expect(stripped.edges[0]?.selected).toBeUndefined()

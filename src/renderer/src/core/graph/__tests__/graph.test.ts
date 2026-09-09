@@ -5,6 +5,7 @@ import type { FlowConnection, FlowEdge, FlowNode } from '../../types'
 import {
   CONTAINER_DEFAULT_HEIGHT,
   CONTAINER_DEFAULT_WIDTH,
+  CONTAINER_PORT_GUTTER,
   canAddOperator,
   collectDanglingEdgeIds,
   collectDescendantIds,
@@ -27,7 +28,9 @@ import {
   normalizeFlowConnection,
   reorderOutgoingEdges,
   overlapRatio,
+  planDragParentChanges,
   remapClipboard,
+  resolvePasteParentId,
   toAbsolutePosition,
   toRelativePosition,
   wouldCreateCycle
@@ -127,12 +130,62 @@ describe('isValidFlowConnection', () => {
     expect(isValidFlowConnection(boxed, [], connection('inside', 'b'))).toBe(true)
   })
 
+  it('allows if/switch case and else outlets and rejects a missing branch handle', () => {
+    const iff = node('iff', 'if', {
+      type: 'branchNode',
+      data: { label: 'if', name: 'If_1', form: { cases: [{ id: 'c1', label: 'Yes', expression: 'x' }] } }
+    })
+    const sw = node('sw', 'switch', {
+      type: 'branchNode',
+      data: { label: 'switch', name: 'Switch_1', form: { cases: [{ id: 'c1', label: 'A', expression: '1' }] } }
+    })
+    const merge = node('m', 'merge', { type: 'taskNode' })
+    const branched = [...nodes, iff, sw, merge]
+    expect(getSourceHandles('if', iff.data.form).map((handle) => handle.id)).toEqual(['c1', 'else'])
+    expect(isValidFlowConnection(branched, [], connection('iff', 'a', 'c1'))).toBe(true)
+    expect(isValidFlowConnection(branched, [], connection('iff', 'b', 'else'))).toBe(true)
+    expect(isValidFlowConnection(branched, [], connection('sw', 'end', 'else'))).toBe(true)
+    expect(isValidFlowConnection(branched, [], connection('iff', 'start', 'c1'))).toBe(false)
+    expect(isValidFlowConnection(branched, [edge('e1', 'iff', 'a', 'c1')], connection('a', 'iff'))).toBe(false)
+    expect(explainInvalidConnection(branched, [], connection('sw', 'sw', 'c1'))).toBe('不能连接：不能连到自己')
+    expect(explainInvalidConnection(branched, [], connection('iff', 'a', 'start'))).toBe('不能连接：无效的出口')
+    expect(explainInvalidConnection(branched, [], connection('sw', 'a'))).toBe('不能连接：无效的出口')
+    expect(explainInvalidConnection(branched, [], connection('a', 'b', 'else'))).toBe('不能连接：无效的出口')
+    expect(isValidFlowConnection(branched, [], connection('a', 'm'))).toBe(true)
+    expect(isValidFlowConnection(branched, [edge('e1', 'a', 'm')], connection('b', 'm'))).toBe(true)
+    expect(isValidFlowConnection(branched, [edge('e1', 'a', 'm')], connection('a', 'm'))).toBe(false)
+  })
+
   it('treats physical start ports as the logical start handle', () => {
     expect(isValidFlowConnection(nodes, [], connection('a', 'b', 'start#new'))).toBe(true)
     expect(isValidFlowConnection(nodes, [edge('e1', 'a', 'b')], connection('a', 'b', 'start#1'))).toBe(false)
     expect(explainInvalidConnection(nodes, [edge('e1', 'a', 'b')], connection('b', 'a', 'start#new'))).toBe(
       '不能连接：会形成环'
     )
+  })
+
+  it('still accepts start#new after many outgoing start edges, and only rejects the duplicate target', () => {
+    const fan = [
+      node('src', 'agent', { type: 'taskNode' }),
+      node('t1', 'message', { type: 'taskNode' }),
+      node('t2', 'message', { type: 'taskNode' }),
+      node('t3', 'message', { type: 'taskNode' }),
+      node('t4', 'message', { type: 'taskNode' }),
+      node('t5', 'code', { type: 'taskNode' }),
+      node('t6', 'code', { type: 'taskNode' })
+    ]
+    const edges = [
+      edge('e1', 'src', 't1'),
+      edge('e2', 'src', 't2'),
+      edge('e3', 'src', 't3'),
+      edge('e4', 'src', 't4'),
+      edge('e5', 'src', 't5')
+    ]
+    expect(isValidFlowConnection(fan, edges, connection('src', 't6', 'start#new'))).toBe(true)
+    expect(hasMatchingConnection(edges, { source: 'src', target: 't6', sourceHandle: 'start#new' })).toBe(
+      false
+    )
+    expect(isValidFlowConnection(fan, edges, connection('src', 't3', 'start#new'))).toBe(false)
   })
 })
 
@@ -302,7 +355,7 @@ describe('container geometry and descendants', () => {
     const outside = node('task', 'agent', { type: 'taskNode', position: { x: 400, y: 300 }, width: 240, height: 80 })
     outside.measured = { width: 240, height: 80 }
     const attach = resolveParentAfterDrag(outside, [container, outside], { x: 480, y: 320 })
-    expect(attach).toEqual({ parentId: 'loop', position: { x: 300, y: 220 } })
+    expect(attach).toEqual({ parentId: 'loop', position: { x: 152, y: 200 } })
     const already = resolveParentAfterDrag(child, [container, child], { x: 200, y: 160 })
     expect(already).toBeNull()
     const hanging = node('hang', 'agent', {
@@ -362,6 +415,7 @@ describe('clipboard remap', () => {
           type: 'taskNode',
           parentId: 'old-loop',
           position: { x: 40, y: 80 },
+          extent: 'parent',
           data: { label: 'agent', name: 'agent_1', form: {} }
         })
       ],
@@ -377,11 +431,299 @@ describe('clipboard remap', () => {
     expect(start?.id).toBe(`${loop?.id}:start`)
     expect(start?.parentId).toBe(loop?.id)
     expect(agent?.parentId).toBe(loop?.id)
+    expect(agent?.extent).toBeUndefined()
     expect(loop?.position).toEqual({ x: 50, y: 60 })
     expect(start?.position).toEqual({ x: 24, y: 56 })
     expect(remapped.edges).toHaveLength(1)
     expect(remapped.edges[0].source).toBe(start?.id)
     expect(remapped.edges[0].target).toBe(agent?.id)
+  })
+
+  it('retargets orphan copies into another container and detaches them on the pane', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode', position: { x: 0, y: 0 } })
+    const dest = node('loop-b', 'foreach', { type: 'containerNode', position: { x: 600, y: 0 } })
+    const inner = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop-a',
+      position: { x: 40, y: 80 }
+    })
+    const payload = { nodes: [inner], edges: [] }
+    const intoB = remapClipboard(payload, [source, dest, inner], { x: 40, y: 40 }, { targetParentId: 'loop-b' })
+    expect(intoB.nodes).toHaveLength(1)
+    expect(intoB.nodes[0]?.parentId).toBe('loop-b')
+    expect(intoB.nodes[0]?.id).not.toBe('inner')
+
+    const ontoPane = remapClipboard(payload, [source, dest, inner], { x: 40, y: 40 }, { targetParentId: null })
+    expect(ontoPane.nodes[0]?.parentId).toBeUndefined()
+    expect(ontoPane.nodes[0]?.position).toEqual({ x: 80, y: 120 })
+  })
+
+  it('clamps an orphan pasted into a dest container off CONTAINER_PORT_GUTTER', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode', position: { x: 0, y: 0 }, width: 560, height: 340 })
+    const dest = node('loop-b', 'foreach', {
+      type: 'containerNode',
+      position: { x: 600, y: 0 },
+      width: 400,
+      height: 300
+    })
+    const inner = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop-a',
+      position: { x: 200, y: 80 },
+      width: 240,
+      height: 80
+    })
+    const intoB = remapClipboard({ nodes: [inner], edges: [] }, [source, dest, inner], { x: 40, y: 40 }, {
+      targetParentId: 'loop-b'
+    })
+    const maxX = 400 - 240 - CONTAINER_PORT_GUTTER
+    expect(intoB.nodes[0]?.parentId).toBe('loop-b')
+    expect(intoB.nodes[0]?.position.x).toBe(maxX)
+    expect(intoB.nodes[0]?.position.x).toBeLessThanOrEqual(maxX)
+  })
+
+  it('omitted or undefined targetParentId keeps the original container (duplicate)', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode', position: { x: 100, y: 80 } })
+    const inner = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop-a',
+      position: { x: 40, y: 90 }
+    })
+    const payload = { nodes: [inner], edges: [] }
+    const omitted = remapClipboard(payload, [source, inner], { x: 40, y: 40 })
+    expect(omitted.nodes[0]?.parentId).toBe('loop-a')
+    expect(omitted.nodes[0]?.position).toEqual({ x: 80, y: 130 })
+
+    const explicitUndefined = remapClipboard(payload, [source, inner], { x: 40, y: 40 }, {
+      targetParentId: undefined
+    })
+    expect(explicitUndefined.nodes[0]?.parentId).toBe('loop-a')
+  })
+
+  it('remaps nested container children even when the payload lists descendants first', () => {
+    const existing = [node('start', 'start', { type: 'startNode' })]
+    const payload = {
+      nodes: [
+        node('old-inner:start', 'loop-start', {
+          type: 'loopStartNode',
+          parentId: 'old-inner',
+          position: { x: 24, y: 56 },
+          data: { label: 'loop-start', name: 'loop-start_1', form: {} }
+        }),
+        node('old-agent', 'agent', {
+          type: 'taskNode',
+          parentId: 'old-inner',
+          position: { x: 40, y: 80 },
+          data: { label: 'agent', name: 'agent_1', form: {} }
+        }),
+        node('old-inner', 'foreach', {
+          type: 'containerNode',
+          parentId: 'old-outer',
+          position: { x: 20, y: 40 },
+          data: { label: 'foreach', name: 'foreach_1', form: {} }
+        }),
+        node('old-outer:start', 'loop-start', {
+          type: 'loopStartNode',
+          parentId: 'old-outer',
+          position: { x: 24, y: 56 },
+          data: { label: 'loop-start', name: 'loop-start_2', form: {} }
+        }),
+        node('old-outer', 'foreach', {
+          type: 'containerNode',
+          position: { x: 10, y: 20 },
+          data: { label: 'foreach', name: 'foreach_2', form: {} }
+        })
+      ],
+      edges: [edge('e1', 'old-inner:start', 'old-agent')]
+    }
+    const remapped = remapClipboard(payload, existing, { x: 40, y: 40 })
+    const outer = remapped.nodes.find((item) => item.id !== 'old-outer' && !item.parentId && item.data.label === 'foreach')
+    const inner = remapped.nodes.find((item) => item.parentId === outer?.id && item.data.label === 'foreach')
+    const innerStart = remapped.nodes.find((item) => item.type === 'loopStartNode' && item.parentId === inner?.id)
+    const agent = remapped.nodes.find((item) => item.data.label === 'agent')
+    expect(outer).toBeDefined()
+    expect(inner).toBeDefined()
+    expect(innerStart?.id).toBe(`${inner?.id}:start`)
+    expect(agent?.parentId).toBe(inner?.id)
+    expect(remapped.edges[0]?.source).toBe(innerStart?.id)
+    expect(remapped.edges[0]?.target).toBe(agent?.id)
+  })
+
+  it('does not nest a pasted while/foreach into another container', () => {
+    const dest = node('loop-b', 'foreach', { type: 'containerNode', position: { x: 600, y: 0 } })
+    const payload = {
+      nodes: [node('w', 'while', { type: 'containerNode', position: { x: 20, y: 20 } })],
+      edges: []
+    }
+    const pasted = remapClipboard(payload, [dest], { x: 40, y: 40 }, { targetParentId: dest.id })
+    expect(pasted.nodes[0]?.data.label).toBe('while')
+    expect(pasted.nodes[0]?.parentId).toBeUndefined()
+    expect(resolveParentAfterDrag(payload.nodes[0]!, [dest, payload.nodes[0]!], { x: 680, y: 40 })).toBeNull()
+  })
+
+  it('resolvePasteParentId prefers a selected destination container', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode' })
+    const dest = node('loop-b', 'foreach', { type: 'containerNode' })
+    const inner = node('inner', 'agent', { type: 'taskNode', parentId: 'loop-a' })
+    const payload = { nodes: [inner], edges: [] }
+    expect(resolvePasteParentId(payload, [source, dest, inner], ['loop-b'])).toBe('loop-b')
+    expect(resolvePasteParentId(payload, [source, dest, inner], ['inner'])).toBeUndefined()
+    expect(resolvePasteParentId(payload, [source, dest, inner], [])).toBeNull()
+  })
+
+  it('resolvePasteParentId uses a destination child or siblings that share a parent', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode' })
+    const dest = node('loop-b', 'foreach', { type: 'containerNode' })
+    const copied = node('copied', 'agent', { type: 'taskNode', parentId: 'loop-a' })
+    const destChild = node('in-b', 'agent', { type: 'taskNode', parentId: 'loop-b' })
+    const destSibling = node('in-b-2', 'message', { type: 'taskNode', parentId: 'loop-b' })
+    const payload = { nodes: [copied], edges: [] }
+    expect(resolvePasteParentId(payload, [source, dest, copied, destChild], ['in-b'])).toBe('loop-b')
+    expect(
+      resolvePasteParentId(payload, [source, dest, copied, destChild, destSibling], ['in-b', 'in-b-2'])
+    ).toBe('loop-b')
+    expect(resolvePasteParentId(payload, [source, dest, copied], ['copied'])).toBeUndefined()
+    expect(resolvePasteParentId(payload, [source, dest, copied], ['start'])).toBeNull()
+  })
+
+  it('does not detach onlyInsideContainer (break) onto the pane', () => {
+    const source = node('loop-a', 'foreach', {
+      type: 'containerNode',
+      position: { x: 100, y: 80 },
+      width: 560,
+      height: 340
+    })
+    const dest = node('loop-b', 'foreach', { type: 'containerNode', position: { x: 600, y: 0 } })
+    const brk = node('brk', 'break', {
+      type: 'breakNode',
+      parentId: 'loop-a',
+      position: { x: 40, y: 90 }
+    })
+    const payload = { nodes: [brk], edges: [] }
+    const ontoPane = remapClipboard(payload, [source, dest, brk], { x: 40, y: 40 }, { targetParentId: null })
+    expect(ontoPane.nodes).toHaveLength(1)
+    expect(ontoPane.nodes[0]?.parentId).toBe('loop-a')
+    expect(ontoPane.nodes[0]?.position).toEqual({ x: 80, y: 130 })
+
+    const intoB = remapClipboard(payload, [source, dest, brk], { x: 40, y: 40 }, { targetParentId: 'loop-b' })
+    expect(intoB.nodes[0]?.parentId).toBe('loop-b')
+
+    const orphaned = remapClipboard(payload, [dest], { x: 40, y: 40 }, { targetParentId: null })
+    expect(orphaned.nodes).toHaveLength(0)
+  })
+
+  it('pane retarget detaches ordinary siblings but keeps break inside its container', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode', position: { x: 100, y: 80 } })
+    const agent = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop-a',
+      position: { x: 40, y: 80 }
+    })
+    const brk = node('brk', 'break', {
+      type: 'breakNode',
+      parentId: 'loop-a',
+      position: { x: 40, y: 160 }
+    })
+    const remapped = remapClipboard({ nodes: [agent, brk], edges: [] }, [source, agent, brk], { x: 40, y: 40 }, {
+      targetParentId: null
+    })
+    const pastedAgent = remapped.nodes.find((item) => item.data.label === 'agent')
+    const pastedBreak = remapped.nodes.find((item) => item.data.label === 'break')
+    expect(pastedAgent?.parentId).toBeUndefined()
+    expect(pastedAgent?.position).toEqual({ x: 180, y: 200 })
+    expect(pastedBreak?.parentId).toBe('loop-a')
+    expect(pastedBreak?.position).toEqual({ x: 80, y: 200 })
+  })
+
+  it('copy children only does not expand the container; copy container includes descendants', () => {
+    const nodes = [
+      node('start', 'start', { type: 'startNode' }),
+      node('loop', 'foreach', { type: 'containerNode' }),
+      node('loop:start', 'loop-start', { type: 'loopStartNode', parentId: 'loop' }),
+      node('a', 'agent', { type: 'taskNode', parentId: 'loop' }),
+      node('b', 'message', { type: 'taskNode', parentId: 'loop' })
+    ]
+    expect(expandCopyIds(nodes, ['a', 'b']).sort()).toEqual(['a', 'b'])
+    expect(extractSubgraph(nodes, [edge('e1', 'a', 'b'), edge('e2', 'loop:start', 'a')], ['a', 'b']).nodes.map((item) => item.id).sort()).toEqual([
+      'a',
+      'b'
+    ])
+    expect(expandCopyIds(nodes, ['loop', 'a']).sort()).toEqual(['a', 'b', 'loop', 'loop:start'])
+  })
+
+  it('collectDescendantIds ignores nodes that no longer use that parentId', () => {
+    const source = node('loop-a', 'foreach', { type: 'containerNode' })
+    const dest = node('loop-b', 'foreach', { type: 'containerNode' })
+    const stayed = node('stay', 'agent', { type: 'taskNode', parentId: 'loop-a' })
+    const moved = node('moved', 'message', { type: 'taskNode', parentId: 'loop-b' })
+    expect(collectDescendantIds([source, dest, stayed, moved], 'loop-a')).toEqual(['stay'])
+    expect(collectDescendantIds([source, dest, stayed, moved], 'loop-b')).toEqual(['moved'])
+  })
+})
+
+describe('planDragParentChanges', () => {
+  it('reparents every dragged sibling onto the pointer container', () => {
+    const box = node('loop', 'foreach', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300
+    })
+    const other = node('loop2', 'foreach', {
+      type: 'containerNode',
+      position: { x: 500, y: 0 },
+      width: 400,
+      height: 300
+    })
+    const a = node('a', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 40, y: 80 },
+      width: 240,
+      height: 80
+    })
+    const b = node('b', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 40, y: 180 },
+      width: 240,
+      height: 80
+    })
+    const changes = planDragParentChanges([a, b], [box, other, a, b], { x: 600, y: 100 })
+    expect(changes).toEqual([
+      expect.objectContaining({ id: 'a', parentId: 'loop2' }),
+      expect.objectContaining({ id: 'b', parentId: 'loop2' })
+    ])
+  })
+
+  it('detaches every dragged sibling when the pointer lands on the pane', () => {
+    const box = node('loop', 'foreach', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300
+    })
+    const a = node('a', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 520, y: 400 },
+      width: 240,
+      height: 80
+    })
+    const b = node('b', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 520, y: 500 },
+      width: 240,
+      height: 80
+    })
+    a.measured = { width: 240, height: 80 }
+    b.measured = { width: 240, height: 80 }
+    const changes = planDragParentChanges([a, b], [box, a, b], { x: 900, y: 900 })
+    expect(changes).toEqual([
+      expect.objectContaining({ id: 'a', parentId: null }),
+      expect.objectContaining({ id: 'b', parentId: null })
+    ])
   })
 })
 
@@ -427,6 +769,18 @@ describe('createOperatorNode / findNonOverlappingPosition', () => {
     expect(third.data.name).toBe('start_2')
     expect(canAddOperator('start', [defaultStart, second])).toBe(true)
     expect(canAddOperator('loop-start', [defaultStart])).toBe(false)
+  })
+
+  it('only allows break inside a live container and never parents a container', () => {
+    const box = createOperatorNode('foreach', { x: 0, y: 0 }, [])
+    const agent = createOperatorNode('agent', { x: 400, y: 0 }, [box])
+    expect(canAddOperator('break', [box], undefined)).toBe(false)
+    expect(canAddOperator('break', [box], 'ghost')).toBe(false)
+    expect(canAddOperator('break', [box, agent], agent.id)).toBe(false)
+    expect(canAddOperator('break', [box], box.id)).toBe(true)
+    expect(canAddOperator('while', [box], box.id)).toBe(false)
+    expect(canAddOperator('while', [box])).toBe(true)
+    expect(createOperatorNode('while', { x: 10, y: 10 }, [box], { parentId: box.id }).parentId).toBeUndefined()
   })
 })
 

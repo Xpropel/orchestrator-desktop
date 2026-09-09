@@ -14,12 +14,23 @@ describe('branchOutletTop vs chrome header', () => {
   })
 
   it('converts a scaled row rect into the local handle top', () => {
+    const rect = (top: number, height: number): DOMRect => ({
+      x: 0,
+      y: top,
+      width: 0,
+      height,
+      top,
+      left: 0,
+      bottom: top + height,
+      right: 0,
+      toJSON: () => ({})
+    })
     const root = {
       offsetHeight: 100,
-      getBoundingClientRect: () => ({ top: 200, height: 200 })
+      getBoundingClientRect: () => rect(200, 200)
     }
     const row = {
-      getBoundingClientRect: () => ({ top: 308, height: 64 })
+      getBoundingClientRect: () => rect(308, 64)
     }
     expect(measureRowCenterY(root, row)).toBe(70)
   })

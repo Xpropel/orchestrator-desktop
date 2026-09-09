@@ -48,5 +48,15 @@ describe('applicationMenuTemplate', () => {
     }
     expect(fileMenu.some((item) => item.role === 'quit')).toBe(true)
     expect(fileMenu.some((item) => item.role === 'recentDocuments')).toBe(false)
+
+    const editMenu = template[1]?.submenu
+    expect(Array.isArray(editMenu)).toBe(true)
+    if (!Array.isArray(editMenu)) {
+      return
+    }
+    const visibleRedo = editMenu.find((item) => item.label === '重做' && item.visible !== false)
+    expect(visibleRedo?.accelerator).toBe('CommandOrControl+Y')
+    expect(editMenu.some((item) => item.accelerator === 'Backspace')).toBe(false)
+    expect(editMenu.some((item) => item.accelerator === 'Delete')).toBe(true)
   })
 })

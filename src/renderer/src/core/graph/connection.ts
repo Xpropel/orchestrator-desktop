@@ -123,6 +123,10 @@ export function explainInvalidConnection(
     return '不能连接：不能连到开始节点'
   }
   if (sourceKind === 'end' || sourceKind === 'break') return '不能连接：该节点没有出口'
+  const allowedSources = sourceHandleIdsOf(source)
+  if (!allowedSources.includes(connection.sourceHandle ?? '')) {
+    return '不能连接：无效的出口'
+  }
   if (isDuplicateConnection(edges, connection)) return '不能连接：重复的连线'
   if (wouldCreateCycle(nodes, edges, connection)) return '不能连接：会形成环'
   return null

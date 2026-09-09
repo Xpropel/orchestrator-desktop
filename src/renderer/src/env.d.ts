@@ -12,6 +12,9 @@ import type {
   serializeDocument
 } from './core/dsl'
 import type { useFlowStore } from './state/flow-store'
+import type { planConnectEnd } from './features/canvas/plan-connect-end'
+import type { mergeNodeMetrics, pickDropTargetNode } from './features/canvas/drop-target'
+import type { getNodeAbsoluteBox } from './core/graph'
 
 declare global {
   interface Window {
@@ -27,6 +30,10 @@ declare global {
       importJson: typeof importJson
       importJsonFromText: typeof importJsonFromText
       normalizeImportedJson: typeof normalizeImportedJson
+      planConnectEnd: typeof planConnectEnd
+      pickDropTargetNode: typeof pickDropTargetNode
+      getNodeAbsoluteBox: typeof getNodeAbsoluteBox
+      mergeNodeMetrics: typeof mergeNodeMetrics
     }
   }
 }

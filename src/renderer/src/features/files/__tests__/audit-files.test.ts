@@ -6,12 +6,13 @@ import { createOperatorNode } from '@/core/graph'
 import { loadLibrary } from '@/core/library'
 import { fileApi } from '@/platform/platform'
 import { useFlowStore } from '@/state/flow-store'
+import { useUiStore } from '@/state/ui-store'
 import {
   resetRecoveryRestoreGate,
   resetRecoveryWriteCache,
   restoreRecoveryIfPresent
 } from '../crash-recovery'
-import { loadFlowFromText, newFlow, saveFlow } from '../file-actions'
+import { loadFlowFromText, newFlow, openExampleFlow, saveFlow } from '../file-actions'
 
 const fixtureDir = dirname(fileURLToPath(import.meta.url))
 const templateText = readFileSync(join(fixtureDir, 'fixtures/ragflow-template.json'), 'utf8')
@@ -122,6 +123,19 @@ describe('audit-files', () => {
     const clear = vi.spyOn(fileApi, 'clearRecovery').mockResolvedValue(undefined)
     await newFlow()
     expect(clear).toHaveBeenCalled()
+  })
+
+  it('openExampleFlow after discard still bumps viewportRequest so leftover picker/menu close', async () => {
+    useFlowStore.getState().addNode(
+      createOperatorNode('agent', { x: 10, y: 10 }, useFlowStore.getState().nodes)
+    )
+    useUiStore.setState({ inspectorNodeId: 'stale', openCategory: 'logic' })
+    vi.spyOn(fileApi, 'confirmUnsaved').mockResolvedValue('discard')
+    const before = useFlowStore.getState().viewportRequest
+    expect(await openExampleFlow('foreach-http-summary')).toBe(true)
+    expect(useFlowStore.getState().viewportRequest).toBeGreaterThan(before)
+    expect(useUiStore.getState().inspectorNodeId).toBeNull()
+    expect(useUiStore.getState().openCategory).toBeNull()
   })
 
   it('does not statically glob examples/private into the renderer module', () => {

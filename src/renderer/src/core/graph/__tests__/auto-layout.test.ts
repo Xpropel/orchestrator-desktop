@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { loadLibrary } from '../../library'
 import type { FlowEdge, FlowNode } from '../../types'
+import { CONTAINER_PORT_GUTTER } from '../containers'
 import { computeAutoLayout } from '../auto-layout'
 
 beforeAll(() => {
@@ -59,9 +60,10 @@ describe('computeAutoLayout', () => {
       const pos = positions[id]
       expect(pos.x).toBeGreaterThanOrEqual(0)
       expect(pos.y).toBeGreaterThanOrEqual(0)
-      expect(pos.x + (child?.width ?? 0)).toBeLessThanOrEqual(box.width)
+      expect(pos.x + (child?.width ?? 0) + CONTAINER_PORT_GUTTER).toBeLessThanOrEqual(box.width)
       expect(pos.y + (child?.height ?? 0)).toBeLessThanOrEqual(box.height)
     }
+    expect(CONTAINER_PORT_GUTTER).toBe(28)
     // 顶层布局使用容器的新尺寸：end 在容器右侧之外
     expect(positions.end.x).toBeGreaterThanOrEqual(positions.loop.x + box.width)
   })

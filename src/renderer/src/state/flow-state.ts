@@ -27,6 +27,9 @@ export interface ClipboardSlice {
 
 export interface ContainerSlice {
   setNodeParent: (nodeId: string, parentId: string | null, relativePosition: XYPosition) => void
+  setNodeParents: (
+    changes: { id: string; parentId: string | null; position: XYPosition }[]
+  ) => void
   removeNode: (id: string) => void
   removeSelected: () => void
 }
@@ -47,6 +50,8 @@ export interface FlowState extends HistorySlice, ClipboardSlice, ContainerSlice,
   filePath: string | null
   title: string
   globals: Record<string, unknown>
+  /** 上一次写入的历史是拖拽落点，随后 setNodeParents 应合并进同一 undo 步。 */
+  historyAmendable: boolean
   revision: number
   viewportRequest: number
   viewport: Viewport

@@ -87,6 +87,7 @@ export function UnsavedDialogHost(): JSX.Element | null {
       <div
         role="dialog"
         aria-modal="true"
+        data-testid="unsaved-dialog"
         className="w-[min(420px,calc(100vw-32px))] rounded-lg border border-border bg-panel p-4 shadow-2xl"
       >
         <h2 className="text-sm font-semibold text-primary">未保存的更改</h2>

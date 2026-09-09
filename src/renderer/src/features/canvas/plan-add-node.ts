@@ -1,5 +1,6 @@
 import {
   canAddOperator,
+  clampPositionInsideParent,
   createOperatorNode,
   estimateNodeSize,
   findContainingContainer,
@@ -8,7 +9,7 @@ import {
   getNodeCenterOffset,
   toRelativePosition
 } from '@/core/graph'
-import { getOperator, hasOperator } from '@/core/registry'
+import { getNodeTypeForKind, getOperator, hasOperator } from '@/core/registry'
 import type { FlowNode, XYPosition } from '@/core/types'
 
 export interface PlanAddOptions {
@@ -51,8 +52,25 @@ export function planAddAtFlowPosition(
     }
   }
 
+  if (parentId) {
+    const parent = nodes.find((node) => node.id === parentId)
+    if (parent) {
+      // 挂进容器时与拖放 / 留在父内 / 粘贴同一套：钳开右侧 + / 出口。
+      position = clampPositionInsideParent(
+        {
+          id: '__add__',
+          type: getNodeTypeForKind(def.kind),
+          position,
+          parentId,
+          data: { label: type, name: type, form: {} }
+        },
+        parent
+      )
+    }
+  }
+
   if (!canAddOperator(type, nodes, parentId)) {
-    if (def.constraints?.onlyInsideContainer && !parentId) {
+    if (def.constraints?.onlyInsideContainer) {
       return { ok: false, toast: BREAK_TOAST }
     }
     return { ok: false }

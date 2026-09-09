@@ -370,14 +370,14 @@ export function documentToGraph(doc: FlowDocument): {
     if (!isRecord(raw)) {
       throw new Error(`Invalid FlowDocument: graph.nodes[${index}] must be an object`)
     }
-    return adaptImportedNode(raw, index, components)
+    return stripRuntimeNode(adaptImportedNode(raw, index, components))
   })
 
   const edges = doc.graph.edges.map((raw, index) => {
     if (!isRecord(raw)) {
       throw new Error(`Invalid FlowDocument: graph.edges[${index}] must be an object`)
     }
-    return adaptImportedEdge(raw, index)
+    return stripRuntimeEdge(adaptImportedEdge(raw, index))
   })
 
   return { nodes, edges, title: doc.title }

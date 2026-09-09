@@ -27,20 +27,35 @@ export function ensureLoopStart(state: { nodes: FlowNode[] }, node: FlowNode): v
 
 export const createContainerSlice: FlowSlice<ContainerSlice> = (set, get) => ({
   setNodeParent: (nodeId, parentId, relativePosition) => {
+    get().setNodeParents([{ id: nodeId, parentId, position: relativePosition }])
+  },
+  setNodeParents: (changes) => {
+    if (changes.length === 0) return
     flushFormHistory()
     set((state) => {
-      const node = state.nodes.find((item) => item.id === nodeId)
-      if (!node || isStartNode(node) || isProtectedNode(node, state.nodes) || isContainerNode(node)) return
-      if (parentId) {
-        const parent = state.nodes.find((item) => item.id === parentId)
-        if (!parent || !isContainerNode(parent)) return
-        node.parentId = parentId
-      } else {
-        delete node.parentId
+      let changed = false
+      for (const change of changes) {
+        const node = state.nodes.find((item) => item.id === change.id)
+        if (!node || isStartNode(node) || isProtectedNode(node, state.nodes) || isContainerNode(node)) {
+          continue
+        }
+        if (change.parentId) {
+          const parent = state.nodes.find((item) => item.id === change.parentId)
+          if (!parent || !isContainerNode(parent)) continue
+          node.parentId = change.parentId
+        } else {
+          delete node.parentId
+        }
+        node.position = { ...change.position }
+        changed = true
       }
-      node.position = { ...relativePosition }
+      if (!changed) return
       dropCrossContainerEdges(state)
-      replaceTopSnapshot(state)
+      if (state.historyAmendable) {
+        replaceTopSnapshot(state)
+      } else {
+        pushSnapshot(state)
+      }
       syncDirtyFromSnapshot(state)
     })
   },

@@ -137,7 +137,7 @@ export function getNodeAbsoluteBox(node: FlowNode, nodes: FlowNode[]): NodeBox {
 }
 
 export const CONTAINER_CHILD_PAD = 16
-/** 右侧留给母组件出口 / + 号，避免子节点盖住拉线。 */
+/** 右侧留给母组件出口 / + 号。挂上、新增、留在父内、粘贴入容器都按此钳位子节点。 */
 export const CONTAINER_PORT_GUTTER = 28
 
 /** 容器要包住直接子节点时的最小尺寸（相对坐标 + 子盒子 + 内边距）。 */
@@ -256,7 +256,7 @@ export function onlyInsideContainerToast(node: FlowNode): string {
   return `${title} 只能放在循环容器内`
 }
 
-/** 把子节点的相对坐标钳回父容器盒子内（含自身尺寸）。 */
+/** 把子节点的相对坐标钳回父容器内，并让出 CONTAINER_PORT_GUTTER，避免挡住 + / 出口。 */
 export function clampPositionInsideParent(node: FlowNode, parent: FlowNode): XYPosition {
   const parentSize = getNodeBoxSize(parent)
   const childSize = getNodeBoxSize(node)
@@ -281,7 +281,7 @@ export function planKeepInsideContainer(
   return { parentId: parent.id, position, toast: onlyInsideContainerToast(node) }
 }
 
-/** 普通子节点拖完后若压到右侧端口带，钳回空隙内。 */
+/** 拖完仍在父容器内：压到右侧端口带则钳回。与挂上 / 新增 / 粘贴入容器同一套 clamp。 */
 export function planClampChildInParent(
   node: FlowNode,
   nodes: FlowNode[]
@@ -304,13 +304,56 @@ export function resolveParentAfterDrag(
   const hit = findIntersectingContainer(node, nodes, pointer)
   const abs = getNodeAbsolutePosition(node, nodes)
   if (hit && node.parentId !== hit.id) {
-    return { parentId: hit.id, position: toRelativePosition(abs, hit, nodes) }
+    const position = toRelativePosition(abs, hit, nodes)
+    return {
+      parentId: hit.id,
+      // 挂上容器时钳开端口带，与新增 / 留在父内 / 粘贴入容器同一套。
+      position: clampPositionInsideParent({ ...node, parentId: hit.id, position }, hit)
+    }
   }
   if (!hit && node.parentId) {
     if (mustRemainInsideContainer(node)) return null
     return { parentId: null, position: abs }
   }
   return null
+}
+
+export type DragParentChange = {
+  id: string
+  parentId: string | null
+  position: XYPosition
+  toast?: string
+}
+
+/** 多选拖完后给每一个被拖节点算归属，避免只有主动点中的那个改了 parentId。 */
+export function planDragParentChanges(
+  dragged: FlowNode[],
+  nodes: FlowNode[],
+  pointer?: XYPosition
+): DragParentChange[] {
+  const result: DragParentChange[] = []
+  const seen = new Set<string>()
+  for (const raw of dragged) {
+    if (seen.has(raw.id)) continue
+    seen.add(raw.id)
+    if (isStartNode(raw) || isProtectedNode(raw, nodes) || isContainerNode(raw)) continue
+    const latest = nodes.find((item) => item.id === raw.id) ?? raw
+    const change = resolveParentAfterDrag(latest, nodes, pointer)
+    if (change) {
+      result.push({ id: latest.id, parentId: change.parentId, position: change.position })
+      continue
+    }
+    const keep = planKeepInsideContainer(latest, nodes)
+    if (keep) {
+      result.push({ id: latest.id, parentId: keep.parentId, position: keep.position, toast: keep.toast })
+      continue
+    }
+    const clamped = planClampChildInParent(latest, nodes)
+    if (clamped) {
+      result.push({ id: latest.id, parentId: clamped.parentId, position: clamped.position })
+    }
+  }
+  return result
 }
 
 function boxesOverlap(a: NodeBox, b: NodeBox, gap: number): boolean {
