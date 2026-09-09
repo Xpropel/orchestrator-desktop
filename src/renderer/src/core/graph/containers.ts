@@ -282,6 +282,17 @@ export function planKeepInsideContainer(
 }
 
 /** 拖完仍在父容器内：压到右侧端口带则钳回。与挂上 / 新增 / 粘贴入容器同一套 clamp。 */
+export function applyContainerPortGutters(nodes: FlowNode[]): FlowNode[] {
+  let changed = false
+  const next = nodes.map((node) => {
+    const clamp = planClampChildInParent(node, nodes)
+    if (!clamp) return node
+    changed = true
+    return { ...node, position: clamp.position }
+  })
+  return changed ? next : nodes
+}
+
 export function planClampChildInParent(
   node: FlowNode,
   nodes: FlowNode[]

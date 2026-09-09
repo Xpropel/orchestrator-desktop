@@ -6,6 +6,7 @@ import {
   CONTAINER_DEFAULT_HEIGHT,
   CONTAINER_DEFAULT_WIDTH,
   CONTAINER_PORT_GUTTER,
+  applyContainerPortGutters,
   canAddOperator,
   collectDanglingEdgeIds,
   collectDescendantIds,
@@ -31,6 +32,7 @@ import {
   planDragParentChanges,
   remapClipboard,
   resolvePasteParentId,
+  sortParentsBeforeChildren,
   toAbsolutePosition,
   toRelativePosition,
   wouldCreateCycle
@@ -781,6 +783,36 @@ describe('createOperatorNode / findNonOverlappingPosition', () => {
     expect(canAddOperator('while', [box], box.id)).toBe(false)
     expect(canAddOperator('while', [box])).toBe(true)
     expect(createOperatorNode('while', { x: 10, y: 10 }, [box], { parentId: box.id }).parentId).toBeUndefined()
+  })
+})
+
+describe('sortParentsBeforeChildren / applyContainerPortGutters', () => {
+  it('moves a container in front of children that were saved first', () => {
+    const child = node('inner', 'agent', { type: 'taskNode', parentId: 'loop', position: { x: 40, y: 80 } })
+    const box = node('loop', 'foreach', { type: 'containerNode', position: { x: 0, y: 0 } })
+    const start = createStartNode()
+    const sorted = sortParentsBeforeChildren([child, start, box])
+    expect(sorted.map((item) => item.id)).toEqual(['start', 'loop', 'inner'])
+    expect(sortParentsBeforeChildren(sorted)).toBe(sorted)
+  })
+
+  it('clamps a loaded child off the parent plus-port gutter', () => {
+    const box = node('loop', 'foreach', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300
+    })
+    const inner = node('inner', 'agent', {
+      type: 'taskNode',
+      parentId: 'loop',
+      position: { x: 300, y: 80 },
+      width: 240,
+      height: 80
+    })
+    const next = applyContainerPortGutters([box, inner])
+    const maxX = 400 - 240 - CONTAINER_PORT_GUTTER
+    expect(next.find((item) => item.id === 'inner')?.position.x).toBe(maxX)
   })
 })
 

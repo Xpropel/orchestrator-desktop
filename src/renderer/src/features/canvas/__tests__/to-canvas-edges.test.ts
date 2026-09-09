@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { HANDLE_START, isLogicalStartHandle, logicalHandleId } from '@/core/handles'
 import { loadLibrary } from '@/core/library'
-import type { FlowEdge } from '@/core/types'
-import { toCanvasEdges } from '../flow-types'
+import type { FlowEdge, FlowNode } from '@/core/types'
+import { toCanvasEdges, toCanvasNodes } from '../flow-types'
 
 beforeAll(() => {
   loadLibrary()
@@ -74,5 +74,24 @@ describe('toCanvasEdges', () => {
         seen.set(raw.source, group)
       }
     }
+  })
+})
+
+describe('toCanvasNodes', () => {
+  it('keeps parents ahead of children so React Flow can attach the group after reload', () => {
+    const inner = {
+      id: 'inner',
+      type: 'taskNode',
+      position: { x: 40, y: 80 },
+      parentId: 'loop',
+      data: { label: 'agent', name: 'inner', form: {} }
+    } as FlowNode
+    const box = {
+      id: 'loop',
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      data: { label: 'foreach', name: 'loop', form: {} }
+    } as FlowNode
+    expect(toCanvasNodes([inner, box]).map((item) => item.id)).toEqual(['loop', 'inner'])
   })
 })

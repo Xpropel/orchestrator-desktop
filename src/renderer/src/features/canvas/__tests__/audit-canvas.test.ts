@@ -378,6 +378,61 @@ describe('planConnectEnd', () => {
     ).toEqual({ kind: 'picker', parentId: 'loop' })
   })
 
+  it('prefers the child under the pointer when RF snaps toHandle to the parent', () => {
+    const box = node('loop', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300,
+      data: { label: 'foreach', name: 'loop', form: {} }
+    })
+    const inner = node('inner', { parentId: 'loop', position: { x: 40, y: 60 }, width: 240, height: 80 })
+    const outside = node('out', { position: { x: 500, y: 40 }, width: 240, height: 80 })
+    expect(
+      planConnectEnd({
+        point: { x: 160, y: 100 },
+        nodes: [box, inner, outside],
+        edges: [edge('e1', 'out', 'loop')],
+        sourceId: 'out',
+        sourceParentId: null,
+        sourceHandle: HANDLE_START,
+        toNodeId: 'loop',
+        toHandleNodeId: 'loop',
+        alreadyConnected: true
+      })
+    ).toEqual({
+      kind: 'connect',
+      connection: { source: 'out', sourceHandle: HANDLE_START, target: 'inner', targetHandle: HANDLE_END }
+    })
+  })
+
+  it('prefers the child under the pointer when a container source snaps toHandle to a sibling', () => {
+    const box = node('loop', {
+      type: 'containerNode',
+      position: { x: 0, y: 0 },
+      width: 400,
+      height: 300,
+      data: { label: 'foreach', name: 'loop', form: {} }
+    })
+    const sibling = node('sibling', { parentId: 'loop', position: { x: 40, y: 180 }, width: 240, height: 80 })
+    const inner = node('inner', { parentId: 'loop', position: { x: 40, y: 60 }, width: 240, height: 80 })
+    expect(
+      planConnectEnd({
+        point: { x: 160, y: 100 },
+        nodes: [start, box, sibling, inner],
+        edges: [],
+        sourceId: 'loop',
+        sourceParentId: null,
+        sourceHandle: HANDLE_START,
+        toNodeId: 'loop',
+        toHandleNodeId: 'sibling'
+      })
+    ).toEqual({
+      kind: 'connect',
+      connection: { source: 'loop', sourceHandle: HANDLE_START, target: 'inner', targetHandle: HANDLE_END }
+    })
+  })
+
   it('connects an inner source onto its ancestor container via the target handle', () => {
     const box = node('loop', {
       type: 'containerNode',

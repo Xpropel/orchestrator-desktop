@@ -9,6 +9,7 @@ import {
 } from './containers'
 import { isContainerNode, isLoopStartNode, isStartNode } from './kind'
 import { createNodeId, nextNodeName } from './naming'
+import { sortParentsBeforeChildren } from './order'
 
 export interface ClipboardGraph {
   nodes: FlowNode[]
@@ -88,24 +89,6 @@ function clipboardAbsolutePosition(node: FlowNode, existingNodes: FlowNode[]): X
   return toAbsolutePosition(node.position, parent, existingNodes)
 }
 
-function ancestryDepth(node: FlowNode, ids: ReadonlySet<string>, byId: Map<string, FlowNode>): number {
-  let depth = 0
-  let parentId = node.parentId
-  const seen = new Set<string>()
-  while (parentId && ids.has(parentId) && !seen.has(parentId)) {
-    seen.add(parentId)
-    depth += 1
-    parentId = byId.get(parentId)?.parentId
-  }
-  return depth
-}
-
-function sortParentsFirst(nodes: FlowNode[]): FlowNode[] {
-  const ids = new Set(nodes.map((node) => node.id))
-  const byId = new Map(nodes.map((node) => [node.id, node]))
-  return [...nodes].sort((left, right) => ancestryDepth(left, ids, byId) - ancestryDepth(right, ids, byId))
-}
-
 export function remapClipboard(
   payload: ClipboardGraph,
   existingNodes: FlowNode[],
@@ -118,7 +101,7 @@ export function remapClipboard(
   const payloadIds = new Set(payload.nodes.map((node) => node.id))
   const retarget = options?.targetParentId !== undefined
 
-  const nodes = sortParentsFirst(payload.nodes.filter((node) => !isStartNode(node))).flatMap((node) => {
+  const nodes = sortParentsBeforeChildren(payload.nodes.filter((node) => !isStartNode(node))).flatMap((node) => {
     const parentInPayload = Boolean(node.parentId && payloadIds.has(node.parentId))
     const mappedParent = node.parentId ? idMap.get(node.parentId) : undefined
     const keepOriginalParent = Boolean(node.parentId && !parentInPayload && existingIds.has(node.parentId))

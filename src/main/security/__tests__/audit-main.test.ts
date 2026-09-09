@@ -46,6 +46,7 @@ import {
 } from '../../window/close-guard'
 import { nativeEditCommand } from '../../menu/native-edit'
 import { formatWindowTitle } from '../../../shared/window-title'
+import { shouldReloadRenderer } from '../../window/renderer-watchdog'
 
 beforeEach(() => {
   mkdirSync(userData, { recursive: true })
@@ -206,6 +207,16 @@ describe('recovery snapshot', () => {
     const clear = clearRecovery()
     await Promise.all([write, clear])
     expect(await readRecovery()).toBeNull()
+  })
+})
+
+describe('renderer watchdog', () => {
+  it('reloads crashed renderers and ignores a clean exit', () => {
+    expect(shouldReloadRenderer('crashed')).toBe(true)
+    expect(shouldReloadRenderer('oom')).toBe(true)
+    expect(shouldReloadRenderer('abnormal-exit')).toBe(true)
+    expect(shouldReloadRenderer('clean-exit')).toBe(false)
+    expect(shouldReloadRenderer('killed')).toBe(false)
   })
 })
 

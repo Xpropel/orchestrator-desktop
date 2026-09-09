@@ -1,4 +1,4 @@
-import { explainInvalidConnection } from '@/core/graph'
+import { explainInvalidConnection, isStartNode } from '@/core/graph'
 import { HANDLE_END, HANDLE_START, logicalHandleId } from '@/core/handles'
 import { getTargetHandles, hasOperator } from '@/core/registry'
 import type { FlowEdge, FlowNode, XYPosition } from '@/core/types'
@@ -89,10 +89,14 @@ export function planConnectEnd(input: {
     input.toNodeId && !isSourceOrAncestor(input.nodes, input.sourceId, input.toNodeId)
       ? input.nodes.find((node) => node.id === input.toNodeId)
       : undefined
-  const hit =
-    (handleNode && !isIgnoredConnectTarget(handleNode) ? handleNode : undefined) ??
-    picked ??
-    (fallback && !isIgnoredConnectTarget(fallback) ? fallback : undefined)
+  const handleHit =
+    handleNode && !isIgnoredConnectTarget(handleNode) ? handleNode : undefined
+  const fallbackHit =
+    fallback && !isIgnoredConnectTarget(fallback) ? fallback : undefined
+  // 指针下的普通节点优先。RF 常把 toHandle 吸到父容器入口；
+  // start 仍可当命中（要 toast），但不能压过已经吸到子节点的 handle。
+  const pointerHit = picked && !isStartNode(picked) ? picked : undefined
+  const hit = pointerHit ?? handleHit ?? picked ?? fallbackHit
 
   // RF 的 toNode 经常是父容器（点在子节点或体内空白上）。alreadyConnected
   // 不得一律取消：只有 RF 报的落点（toHandle / toNode）就是这次命中时才跳过。

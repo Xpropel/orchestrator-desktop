@@ -27,6 +27,7 @@ export {
   CONTAINER_PORT_GUTTER,
   LOOP_START_POSITION,
   type NodeBox,
+  applyContainerPortGutters,
   collectDescendantIds,
   estimateNodeSize,
   findContainingContainer,
@@ -59,6 +60,7 @@ export {
 } from './create-node'
 export { idsProtectedFromRemoval, isContainerNode, isLoopStartNode, isProtectedNode, isStartNode } from './kind'
 export { createNodeId, nextNodeName } from './naming'
+export { sortParentsBeforeChildren } from './order'
 export {
   type DownstreamRow,
   downstreamRows,

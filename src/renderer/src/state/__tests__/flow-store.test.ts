@@ -714,6 +714,26 @@ describe('flow-store', () => {
     expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.parentId).toBe(box.id)
   })
 
+  it('loadDocument puts the container in front of children listed first', () => {
+    const box = createOperatorNode('foreach', { x: 200, y: 80 }, useFlowStore.getState().nodes)
+    const inner = createOperatorNode('agent', { x: 40, y: 90 }, useFlowStore.getState().nodes, {
+      parentId: box.id
+    })
+    useFlowStore.getState().loadDocument(
+      {
+        version: 1,
+        title: 'ChildFirst',
+        graph: { nodes: [inner, box], edges: [] },
+        components: {},
+        globals: {}
+      },
+      null
+    )
+    const ids = useFlowStore.getState().nodes.map((node) => node.id)
+    expect(ids.indexOf(box.id)).toBeLessThan(ids.indexOf(inner.id))
+    expect(useFlowStore.getState().nodes.find((node) => node.id === inner.id)?.parentId).toBe(box.id)
+  })
+
   it('applyNodePositions writes coords/size, pushes one history entry, and undoes', () => {
     const start = useFlowStore.getState().nodes[0]
     const past = useFlowStore.getState().historyPast.length

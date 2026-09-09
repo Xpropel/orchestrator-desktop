@@ -11,7 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import { flushSync } from 'react-dom'
-import { Position, useStore, useStoreApi, useUpdateNodeInternals } from '@xyflow/react'
+import { Position, useNodesInitialized, useStoreApi, useUpdateNodeInternals } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 import { HANDLE_START, HANDLE_START_NEW, isLogicalStartHandle, physicalSourceHandle } from '@/core/handles'
 import { cn } from '@/ui/cn'
@@ -54,6 +54,11 @@ export function pointerDeltaToPortOffset(deltaClientY: number, zoom: number): nu
   return deltaClientY / (zoom || 1)
 }
 
+/** 用仓库里的显式宽高，不用 RF `measured`：updateNodeInternals 会改 measured，再拿它当 effect 依赖会量测死循环，窗口直接没掉。 */
+export function portLayoutKey(node: { width?: number | null; height?: number | null } | undefined): string {
+  return `${node?.width ?? 0}:${node?.height ?? 0}`
+}
+
 export function useStartOutgoingCount(nodeId: string): number {
   return useFlowStore(
     (state) => state.edges.filter((edge) => edge.source === nodeId && isLogicalStartHandle(edge.sourceHandle)).length
@@ -83,12 +88,12 @@ export const OrderedSourcePorts = memo(function OrderedSourcePorts({
   )
   const moveOutgoingEdge = useFlowStore((state) => state.moveOutgoingEdge)
   const updateNodeInternals = useUpdateNodeInternals()
+  const nodesInitialized = useNodesInitialized()
   const rfStore = useStoreApi()
   const occupied = outgoingIds.length
-  const measuredKey = useStore((state) => {
-    const node = state.nodeLookup.get(nodeId)
-    return `${node?.measured?.width ?? node?.width ?? 0}:${node?.measured?.height ?? node?.height ?? 0}`
-  })
+  const layoutKey = useFlowStore((state) =>
+    portLayoutKey(state.nodes.find((node) => node.id === nodeId))
+  )
   const [drag, setDrag] = useState<PortDrag | null>(null)
   const dragRef = useRef<PortDrag | null>(null)
   const moveRaf = useRef(0)
@@ -106,7 +111,7 @@ export const OrderedSourcePorts = memo(function OrderedSourcePorts({
 
   useLayoutEffect(() => {
     measureHandles()
-  }, [drag, outgoingIds, measuredKey, measureHandles])
+  }, [drag, outgoingIds, layoutKey, nodesInitialized, measureHandles])
 
   const cancelDrag = useCallback(() => {
     if (moveRaf.current) {

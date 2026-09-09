@@ -2,6 +2,8 @@ import { nanoid } from 'nanoid'
 import { deepClone } from './clone'
 import { keyValueItemsToRecord, parseCases, parseCategories, parseKeyValueItems } from './form-items'
 import { normalizeStoredEdge } from './graph/connection'
+import { applyContainerPortGutters } from './graph/containers'
+import { sortParentsBeforeChildren } from './graph/order'
 import { stripRuntimeEdge, stripRuntimeNode } from './graph/snapshot'
 import { parentIdOf } from './graph/parent-id'
 import { HANDLE_ELSE, logicalHandleId } from './handles'
@@ -366,12 +368,16 @@ export function documentToGraph(doc: FlowDocument): {
   }
 
   const components = doc.components ?? {}
-  const nodes = doc.graph.nodes.map((raw, index) => {
-    if (!isRecord(raw)) {
-      throw new Error(`Invalid FlowDocument: graph.nodes[${index}] must be an object`)
-    }
-    return stripRuntimeNode(adaptImportedNode(raw, index, components))
-  })
+  const nodes = applyContainerPortGutters(
+    sortParentsBeforeChildren(
+      doc.graph.nodes.map((raw, index) => {
+        if (!isRecord(raw)) {
+          throw new Error(`Invalid FlowDocument: graph.nodes[${index}] must be an object`)
+        }
+        return stripRuntimeNode(adaptImportedNode(raw, index, components))
+      })
+    )
+  )
 
   const edges = doc.graph.edges.map((raw, index) => {
     if (!isRecord(raw)) {

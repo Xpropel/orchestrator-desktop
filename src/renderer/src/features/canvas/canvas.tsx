@@ -12,6 +12,7 @@ import {
   ReactFlowProvider,
   useNodesInitialized,
   useReactFlow,
+  useUpdateNodeInternals,
   type DefaultEdgeOptions,
   type IsValidConnection,
   type OnConnectEnd,
@@ -28,6 +29,7 @@ import { nextSelectedIds, planNodeClick, selectedIdsOf, selectionChangesFor } fr
 import {
   findContainingContainer,
   hasMatchingConnection,
+  isContainerNode,
   isProtectedNode,
   isValidFlowConnection,
   planDragParentChanges
@@ -112,6 +114,7 @@ function FlowCanvas(): JSX.Element {
   const closeInspector = useUiStore((state) => state.closeInspector)
 
   const { screenToFlowPosition, fitView, getNodes } = useReactFlow()
+  const updateNodeInternals = useUpdateNodeInternals()
   const { addAtFlowPosition } = useAddNode()
   const { hasClipboard } = useClipboard()
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
@@ -119,6 +122,10 @@ function FlowCanvas(): JSX.Element {
   const nodesInitialized = useNodesInitialized()
   const [fitPending, setFitPending] = useState(false)
   const selectionAtPointerDown = useRef<string[]>([])
+  const containerIdsKey = useMemo(
+    () => nodes.filter(isContainerNode).map((node) => node.id).join('\0'),
+    [nodes]
+  )
 
   useEffect(() => {
     if (viewportRequest === 0) {
@@ -138,6 +145,12 @@ function FlowCanvas(): JSX.Element {
     setFitPending(false)
     void fitView({ padding: 0.2 })
   }, [fitPending, nodesInitialized, fitView])
+
+  // 关窗再开 / 恢复快照会剥掉 measured，母组件 + 的 handleBounds 是空的，拉不出线。
+  useEffect(() => {
+    if (!nodesInitialized || !containerIdsKey) return
+    updateNodeInternals(containerIdsKey.split('\0'))
+  }, [nodesInitialized, viewportRequest, containerIdsKey, updateNodeInternals])
 
   useEffect(() => {
     const onFocus = (event: Event): void => {

@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
+import { sortParentsBeforeChildren } from '@/core/graph'
 import { HANDLE_START, isLogicalStartHandle, physicalSourceHandle } from '@/core/handles'
 import type { BaseNodeData, FlowEdge, FlowNode } from '@/core/types'
 
@@ -11,7 +12,7 @@ export function toCanvasNode(node: FlowNode): CanvasNode {
 }
 
 export function toCanvasNodes(nodes: FlowNode[]): CanvasNode[] {
-  return nodes as CanvasNode[]
+  return sortParentsBeforeChildren(nodes) as CanvasNode[]
 }
 
 export function toCanvasEdges(edges: FlowEdge[]): CanvasEdge[] {

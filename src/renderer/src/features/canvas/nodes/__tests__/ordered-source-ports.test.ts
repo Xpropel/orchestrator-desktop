@@ -4,6 +4,7 @@ import {
   isClickDisplacement,
   orderedPortTop,
   pointerDeltaToPortOffset,
+  portLayoutKey,
   yieldedSlot,
   SOURCE_PORT_PITCH
 } from '../ordered-source-ports'
@@ -46,5 +47,13 @@ describe('pointerDeltaToPortOffset', () => {
     expect(pointerDeltaToPortOffset(40, 1)).toBe(40)
     expect(pointerDeltaToPortOffset(40, 0.5)).toBe(80)
     expect(pointerDeltaToPortOffset(40, 0)).toBe(40)
+  })
+})
+
+describe('portLayoutKey', () => {
+  it('uses explicit store size and ignores missing measured fields', () => {
+    expect(portLayoutKey(undefined)).toBe('0:0')
+    expect(portLayoutKey({ width: 560, height: 340 })).toBe('560:340')
+    expect(portLayoutKey({ width: 560, height: null })).toBe('560:0')
   })
 })

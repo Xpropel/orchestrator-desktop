@@ -453,6 +453,41 @@ describe('documentToGraph / serialize / parse', () => {
     expect(graphOnly.graph.nodes).toHaveLength(1)
   })
 
+  it('puts a parent in front of children even when JSON listed the child first', () => {
+    const imported = documentToGraph(
+      parseDocument(
+        JSON.stringify({
+          version: 1,
+          title: 'ChildFirst',
+          graph: {
+            nodes: [
+              {
+                id: 'inner',
+                type: 'taskNode',
+                position: { x: 40, y: 80 },
+                parentId: 'loop',
+                data: { label: 'agent', name: 'Agent_1', form: {} }
+              },
+              {
+                id: 'loop',
+                type: 'containerNode',
+                position: { x: 0, y: 0 },
+                width: 400,
+                height: 300,
+                data: { label: 'foreach', name: 'For_1', form: { items: '{{sys.files}}' } }
+              }
+            ],
+            edges: []
+          },
+          components: {}
+        })
+      )
+    )
+    expect(imported.nodes.map((item) => item.id)).toEqual(['loop', 'inner'])
+    expect(imported.nodes[0]?.parentId).toBeUndefined()
+    expect(imported.nodes[1]?.parentId).toBe('loop')
+  })
+
   it('strips a legacy extent flag from container children', () => {
     const doc = graphToDocument(
       [

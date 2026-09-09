@@ -1,4 +1,4 @@
-import { snapshotKeyOf, stripRuntimeFields } from '@/core/graph'
+import { applyContainerPortGutters, snapshotKeyOf, sortParentsBeforeChildren, stripRuntimeFields } from '@/core/graph'
 import type { FlowSlice } from './flow-slice'
 import { emptyCanvas, keyOf, snapshotOf, titleFromPath } from './flow-helpers'
 import { flushFormHistory } from './history-slice'
@@ -36,7 +36,7 @@ export const createDirtySlice: FlowSlice<DirtySlice> = (set) => ({
     useUiStore.getState().closeTransientUi()
     set((state) => {
       const stripped = stripRuntimeFields(doc.graph.nodes, doc.graph.edges)
-      state.nodes = stripped.nodes
+      state.nodes = applyContainerPortGutters(sortParentsBeforeChildren(stripped.nodes))
       state.edges = stripped.edges
       state.title = doc.title
       state.filePath = filePath

@@ -12,6 +12,7 @@ import { attachSmokeHooks } from './window/smoke'
 import { createWindow, sendMenuAction } from './window/create'
 import { deliverOpenPath, flowPathsFromArgv } from './window/open-file'
 import { APP_TITLE, appState } from './window/app-state'
+import { logMain } from './window/renderer-watchdog'
 
 app.setName(APP_TITLE)
 
@@ -58,7 +59,20 @@ app.whenReady().then(async () => {
   })
 })
 
+process.on('uncaughtException', (error) => {
+  logMain('uncaughtException', { message: error.message, stack: error.stack })
+})
+
+process.on('unhandledRejection', (reason) => {
+  logMain('unhandledRejection', { reason: String(reason) })
+})
+
+app.on('child-process-gone', (_event, details) => {
+  logMain('child-process-gone', details)
+})
+
 app.on('before-quit', () => {
+  logMain('before-quit')
   appState.quitRequested = true
 })
 

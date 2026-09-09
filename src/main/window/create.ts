@@ -8,6 +8,7 @@ import { attachNavigationGuard, attachWindowOpenHandler } from '../security/navi
 import { APP_TITLE } from './app-state'
 import { attachCloseGuard } from './close-guard'
 import { attachOpenPathFlush } from './open-file'
+import { attachRendererWatchdog } from './renderer-watchdog'
 
 function resolvePreloadPath(): string {
   const preloadJs = join(__dirname, '../preload/index.js')
@@ -113,6 +114,7 @@ export function createWindow(): BrowserWindow {
   attachWindowOpenHandler(mainWindow.webContents)
   attachNavigationGuard(mainWindow.webContents)
   attachCloseGuard(mainWindow)
+  attachRendererWatchdog(mainWindow)
   attachOpenPathFlush(mainWindow)
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
