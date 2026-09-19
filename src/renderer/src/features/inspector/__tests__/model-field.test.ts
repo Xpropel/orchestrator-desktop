@@ -23,17 +23,24 @@ describe('ModelField', () => {
     const html = render('')
     expect(html).toContain('选择模型')
     expect(html).toContain('data-testid="model-field-trigger"')
-    expect(html).toContain('deepseek-chat')
+    expect(html).toContain('快速模式')
     expect(html).toContain('qwen-plus')
     expect(html).toContain('自定义模型名…')
   })
 
-  it('shows icon plus preset id for a known model', () => {
+  it('shows icon plus preset label for a known model', () => {
     const html = render('qwen-plus')
     expect(html).toContain('qwen-plus')
     expect(html).toContain('#605BEC')
     expect(html).not.toContain('选择模型')
-    expect(html).toContain('data-testid="model-option-deepseek-chat"')
+    expect(html).toContain('data-testid="model-option-default"')
+  })
+
+  it('treats legacy deepseek-chat as the official default preset', () => {
+    const html = render('deepseek-chat')
+    expect(html).toContain('快速模式')
+    expect(html).toContain('data-testid="model-field-trigger"')
+    expect(html).not.toContain('data-testid="model-field-custom-input"')
   })
 
   it('switches to a text input for a custom model name', () => {

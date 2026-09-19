@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { isModelPresetId, modelPresetsGrouped, resolveModel } from '@/core/models'
+import { isModelPresetId, migrateModelId, modelPresetsGrouped, resolveModel } from '@/core/models'
 import { asString } from '@/features/inspector/form-utils'
 import { Button } from '@/ui/button'
 import { Field } from '@/ui/field'
@@ -14,6 +14,7 @@ const CUSTOM_LABEL = '自定义模型名…'
 
 export function ModelField({ field, value, onChange }: SchemaFieldProps): JSX.Element {
   const current = asString(value)
+  const selectedId = migrateModelId(current.trim())
   const resolved = resolveModel(current)
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState(() => current.trim().length > 0 && !isModelPresetId(current.trim()))
@@ -103,12 +104,15 @@ export function ModelField({ field, value, onChange }: SchemaFieldProps): JSX.El
                     data-testid={`model-option-${preset.id}`}
                     className={cn(
                       'flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs text-primary hover:bg-elevated',
-                      current === preset.id && 'bg-elevated'
+                      selectedId === preset.id && 'bg-elevated'
                     )}
                     onClick={() => pick(preset.id)}
                   >
                     <ModelProviderIcon provider={preset.provider} className="h-4 w-4" />
-                    <span className="truncate">{preset.id}</span>
+                    <span className="min-w-0 flex-1 truncate">{preset.label}</span>
+                    {preset.label !== preset.id ? (
+                      <span className="shrink-0 text-[10px] text-secondary">{preset.id}</span>
+                    ) : null}
                   </button>
                 ))}
               </div>

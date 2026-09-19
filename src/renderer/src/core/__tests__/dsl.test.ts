@@ -258,6 +258,20 @@ describe('documentToGraph / serialize / parse', () => {
     expect(edges[0]?.type).toBe('buttonEdge')
   })
 
+  it('migrates obsolete DeepSeek model ids on import', () => {
+    const doc = graphToDocument(
+      [
+        makeNode('s1', 'session', { model: 'deepseek-chat' }),
+        makeNode('a1', 'agent', { model: 'deepseek-reasoner', prompt: 'hi' })
+      ],
+      [],
+      'LegacyModels'
+    )
+    const { nodes } = documentToGraph(doc)
+    expect(nodes.find((item) => item.id === 's1')?.data.form.model).toBe('default')
+    expect(nodes.find((item) => item.id === 'a1')?.data.form.model).toBe('default')
+  })
+
   it('throws a clear error for illegal documents', () => {
     expect(() => parseDocument('not-json')).toThrow(/malformed JSON/)
     expect(() => parseDocument('{"title":"x"}')).toThrow(/version 1/)

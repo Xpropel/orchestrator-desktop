@@ -8,6 +8,7 @@ import { stripRuntimeEdge, stripRuntimeNode } from './graph/snapshot'
 import { parentIdOf } from './graph/parent-id'
 import { HANDLE_ELSE, logicalHandleId } from './handles'
 import { migrateLabel, resolveOperatorType } from './migrations'
+import { migrateFormModels } from './models'
 import { getNodeTypeForKind, getOperator, getSourceHandles, hasOperator } from './registry'
 import { isRecord } from './schema'
 import type { CaseItem, CategoryItem } from './schema'
@@ -260,6 +261,10 @@ function adaptImportedNode(
     const data = raw.data
     node.data.form = isRecord(data) && isRecord(data.form) ? deepClone(data.form) : {}
     node.data.description = `原类型: ${originalLabel}`
+  }
+
+  if (isRecord(node.data.form)) {
+    node.data.form = migrateFormModels(node.data.form)
   }
 
   const operator = getOperator(resolved)

@@ -49,10 +49,24 @@ describe('registry', () => {
 
     const session = getDefaultForm('session')
     expect(session.keepAlive).toBe(true)
-    expect(session.model).toBe('deepseek-chat')
+    expect(session.model).toBe('default')
+    expect(session.thinkingEnabled).toBe(true)
     expect(session).not.toHaveProperty('provider')
     expect(session).not.toHaveProperty('baseUrl')
     expect(session).not.toHaveProperty('apiKeyRef')
+
+    const agent = getDefaultForm('agent')
+    expect(agent.thinkingEnabled).toBe(true)
+
+    if (hasOperator('ds2api.chat.completion')) {
+      const completion = getDefaultForm('ds2api.chat.completion')
+      expect(completion.model_type).toBe('default')
+      expect(completion.thinking).toBe(true)
+      expect(completion.search).toBe(false)
+    }
+    if (hasOperator('cv3.run_config')) {
+      expect(getDefaultForm('cv3.run_config').model).toBe('default')
+    }
   })
 
   it('maps kinds to the 8 React Flow node types', () => {

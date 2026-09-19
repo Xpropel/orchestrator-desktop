@@ -3,9 +3,12 @@ import { builtinLibrary, loadLibrary } from '../library'
 import { registerLibrary } from '../registry'
 import type { OperatorDefinition } from '../schema'
 import {
+  DEFAULT_DEEPSEEK_MODEL,
   MODEL_PRESETS,
   MODEL_PROVIDERS,
   isModelPresetId,
+  migrateFormModels,
+  migrateModelId,
   modelPresetsGrouped,
   resolveModel,
   resolveNodeModel,
@@ -21,21 +24,44 @@ function node(id: string, label: string, name: string, form: Record<string, unkn
 }
 
 describe('MODEL_PROVIDERS / MODEL_PRESETS', () => {
-  it('registers DeepSeek and 通义千问 with four presets', () => {
+  it('registers DeepSeek official model_type values and 通义千问', () => {
     expect(MODEL_PROVIDERS).toEqual([
       { key: 'deepseek', title: 'DeepSeek' },
       { key: 'qwen', title: '通义千问' }
     ])
     expect(MODEL_PRESETS.map((item) => item.id)).toEqual([
-      'deepseek-chat',
-      'deepseek-reasoner',
+      'default',
+      'expert',
+      'vision',
       'qwen-plus',
       'qwen-max'
     ])
-    expect(MODEL_PRESETS.every((item) => item.label === item.id)).toBe(true)
+    expect(MODEL_PRESETS.find((item) => item.id === 'default')?.label).toBe('快速模式')
+    expect(isModelPresetId('default')).toBe(true)
     expect(isModelPresetId('deepseek-chat')).toBe(true)
     expect(isModelPresetId('gpt-4o')).toBe(false)
     expect(modelPresetsGrouped().map((group) => group.title)).toEqual(['DeepSeek', '通义千问'])
+  })
+})
+
+describe('migrateModelId / migrateFormModels', () => {
+  it('rewrites obsolete DeepSeek ids onto default', () => {
+    expect(migrateModelId('deepseek-chat')).toBe(DEFAULT_DEEPSEEK_MODEL)
+    expect(migrateModelId('deepseek-reasoner')).toBe(DEFAULT_DEEPSEEK_MODEL)
+    expect(migrateModelId('default')).toBe('default')
+    expect(migrateModelId('expert')).toBe('expert')
+    expect(migrateModelId('qwen-plus')).toBe('qwen-plus')
+  })
+
+  it('rewrites form.model and form.model_type in place keys only', () => {
+    expect(migrateFormModels({ model: 'deepseek-chat', prompt: 'hi' })).toEqual({
+      model: 'default',
+      prompt: 'hi'
+    })
+    expect(migrateFormModels({ model_type: 'deepseek-reasoner' })).toEqual({ model_type: 'default' })
+    expect(migrateFormModels({ to_model_type: 'deepseek-chat' })).toEqual({ to_model_type: 'default' })
+    const untouched = { model: 'qwen-plus' }
+    expect(migrateFormModels(untouched)).toBe(untouched)
   })
 })
 
@@ -48,9 +74,12 @@ describe('resolveModel', () => {
     expect(resolveModel('   ')).toBeNull()
   })
 
-  it('hits presets by exact id', () => {
-    expect(resolveModel('deepseek-chat')).toEqual({ provider: 'deepseek', name: 'deepseek-chat' })
-    expect(resolveModel('deepseek-reasoner')).toEqual({ provider: 'deepseek', name: 'deepseek-reasoner' })
+  it('hits presets by official id and legacy aliases', () => {
+    expect(resolveModel('default')).toEqual({ provider: 'deepseek', name: '快速模式' })
+    expect(resolveModel('expert')).toEqual({ provider: 'deepseek', name: '专家模式' })
+    expect(resolveModel('vision')).toEqual({ provider: 'deepseek', name: '识图模式' })
+    expect(resolveModel('deepseek-chat')).toEqual({ provider: 'deepseek', name: '快速模式' })
+    expect(resolveModel('deepseek-reasoner')).toEqual({ provider: 'deepseek', name: '快速模式' })
     expect(resolveModel('qwen-plus')).toEqual({ provider: 'qwen', name: 'qwen-plus' })
     expect(resolveModel('qwen-max')).toEqual({ provider: 'qwen', name: 'qwen-max' })
   })
@@ -69,10 +98,19 @@ describe('resolveModel', () => {
 
 describe('resolveNodeModel', () => {
   it('uses the operator form.model when present', () => {
-    const session = node('s1', 'session', 'Session_1', { model: 'deepseek-chat' })
+    const session = node('s1', 'session', 'Session_1', { model: 'default' })
     expect(resolveNodeModel(session, [session])).toEqual({
       provider: 'deepseek',
-      name: 'deepseek-chat',
+      name: '快速模式',
+      inherited: false
+    })
+  })
+
+  it('uses form.model_type when form.model is empty', () => {
+    const chat = node('c1', 'ds2api.chat.completion', 'Chat_1', { model_type: 'expert' })
+    expect(resolveNodeModel(chat, [chat])).toEqual({
+      provider: 'deepseek',
+      name: '专家模式',
       inherited: false
     })
   })
@@ -88,7 +126,7 @@ describe('resolveNodeModel', () => {
   })
 
   it('walks a session-fork chain up to eight hops', () => {
-    const session = node('s1', 'session', 'Session_1', { model: 'deepseek-reasoner' })
+    const session = node('s1', 'session', 'Session_1', { model: 'vision' })
     const forks = Array.from({ length: 8 }, (_, index) => {
       const n = index + 1
       const source = index === 0 ? '{{Session_1.session}}' : `{{Fork_${index}.session}}`
@@ -98,13 +136,13 @@ describe('resolveNodeModel', () => {
     const nodes = [session, ...forks, agent]
     expect(resolveNodeModel(agent, nodes)).toEqual({
       provider: 'deepseek',
-      name: 'deepseek-reasoner',
+      name: '识图模式',
       inherited: true
     })
   })
 
   it('stops walking a fork chain after eight hops', () => {
-    const session = node('s1', 'session', 'Session_1', { model: 'deepseek-chat' })
+    const session = node('s1', 'session', 'Session_1', { model: 'default' })
     const forks = Array.from({ length: 9 }, (_, index) => {
       const n = index + 1
       const source = index === 0 ? '{{Session_1.session}}' : `{{Fork_${index}.session}}`
@@ -163,23 +201,23 @@ describe('resolveNodeModel', () => {
     const classifier = node('c1', 'classifier', 'Classifier_1', { session: '{{Fork_1.session}}' })
     expect(resolveNodeModel(fork, [session, fork, classifier])).toEqual({
       provider: 'deepseek',
-      name: 'deepseek-chat',
+      name: '快速模式',
       inherited: true
     })
     expect(resolveNodeModel(classifier, [session, fork, classifier])).toEqual({
       provider: 'deepseek',
-      name: 'deepseek-chat',
+      name: '快速模式',
       inherited: true
     })
   })
 
   it('inherits through an agent→fork→agent chain', () => {
-    const session = node('s1', 'session', 'Session_1', { model: 'deepseek-chat' })
+    const session = node('s1', 'session', 'Session_1', { model: 'default' })
     const agent1 = node('a1', 'agent', 'Agent_1', { session: '{{Session_1.session}}', model: '' })
     const fork = node('f1', 'session-fork', 'Fork_A', { source: '{{Agent_1.session}}' })
     const agent2 = node('a2', 'agent', 'Agent_2', { session: '{{Fork_A.session}}', model: '' })
     const nodes = [session, agent1, fork, agent2]
-    const inherited = { provider: 'deepseek' as const, name: 'deepseek-chat', inherited: true }
+    const inherited = { provider: 'deepseek' as const, name: '快速模式', inherited: true }
     expect(resolveNodeModel(agent1, nodes)).toEqual(inherited)
     expect(resolveNodeModel(fork, nodes)).toEqual(inherited)
     expect(resolveNodeModel(agent2, nodes)).toEqual(inherited)

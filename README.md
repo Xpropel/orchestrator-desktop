@@ -50,7 +50,7 @@ macOS 包仅面向 **Apple Silicon**，未做 Intel 构建；未公证时首次�
 - **变量引用**：`{{Node.var}}`（节点名 + 输出变量）；全局 `{{sys.query}}` / `{{sys.files}}` / `{{sys.now}}`；start 入参按该 start 的节点名暴露。属性面板的 `variable` 字段为选择器，`template` / `expression` 可插入变量。
 - **有序出口**：同一节点多条出边可在端口上拖动换位（属性面板「下游顺序」亦可）；`+` 小球始终可拉新线。把连线拖到目标节点本体松手即连接；拖到空白处弹出算子选择器。
 - **输出变量**：节点卡片底部列出该节点暴露给下游的变量名（含 `start.inputs` / `dataset.fields` 声明的字段）；属性面板给出 `{{节点名.变量}}` 形式的引用。它与出边数量无关。
-- **模型徽标**：LLM 相关节点显示 DeepSeek / 通义千问图标 + 模型名（预设 `deepseek-chat`、`deepseek-reasoner`、`qwen-plus`、`qwen-max`，也可自定义字符串）。编排器不配置、不保存 API Key。
+- **模型徽标**：LLM 相关节点显示 DeepSeek / 通义千问图标 + 模型名。DeepSeek 预设对齐网页端 `model_type`：`default`（快速模式，默认）、`expert`（专家）、`vision`（识图）；通义千问仍为 `qwen-plus` / `qwen-max`。旧文档里的 `deepseek-chat` / `deepseek-reasoner` 打开时会迁到 `default`。新会话默认开启深度思考。编排器不配置、不保存 API Key。
 - **多入口**：可添加多个 `start`；空画布第一个 id/name 为 `start`，其后为 `start:<id>`。最后一个 start 不可删除。
 - **撤销 / 重做**：Windows 为 Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z）；Mac 为 ⌘Z / ⌘⇧Z。
 - **自动保存**：仅 Electron；已命名且脏时按间隔静默写回（30s / 1m / 2m / 5m，默认 1 分钟）。未命名文件不自动保存。

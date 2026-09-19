@@ -1,3 +1,4 @@
+import { DEFAULT_DEEPSEEK_MODEL, DEFAULT_THINKING_ENABLED } from '../models'
 import type { OperatorDefinition } from '../schema'
 import { LLM, op } from './define'
 
@@ -11,7 +12,14 @@ export const LLM_OPERATORS: OperatorDefinition[] = [
     'llm',
     'task',
     [
-      { key: 'model', label: '模型', type: 'model', required: true, default: 'deepseek-chat' },
+      { key: 'model', label: '模型', type: 'model', required: true, default: DEFAULT_DEEPSEEK_MODEL },
+      {
+        key: 'thinkingEnabled',
+        label: '深度思考',
+        type: 'boolean',
+        default: DEFAULT_THINKING_ENABLED,
+        hint: '对应 DeepSeek thinking_enabled；新会话默认开启'
+      },
       { key: 'system', label: '系统提示词', type: 'template', hint: '随会话固定' },
       { key: 'temperature', label: '温度', type: 'slider', default: 0.7, min: 0, max: 2, step: 0.1 },
       { key: 'maxTokens', label: '最大 Tokens', type: 'number', min: 1 },
@@ -66,6 +74,13 @@ export const LLM_OPERATORS: OperatorDefinition[] = [
         extra: { accept: ['session'] }
       },
       { key: 'model', label: '模型', type: 'model', hint: '未挂会话时必填' },
+      {
+        key: 'thinkingEnabled',
+        label: '深度思考',
+        type: 'boolean',
+        default: DEFAULT_THINKING_ENABLED,
+        hint: '对应 DeepSeek thinking_enabled；未挂会话时按此发送'
+      },
       { key: 'system', label: '系统提示词', type: 'template', hint: '未挂会话时可用' },
       { key: 'prompt', label: '提示词', type: 'template', required: true },
       { key: 'tools', label: '工具', type: 'stringList', default: [] },
